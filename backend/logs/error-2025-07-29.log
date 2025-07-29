@@ -1,0 +1,24 @@
+2025-07-29 15:08:09 [ERROR]: Uncaught Exception {"service":"examtech-backend","environment":"development","error":"Route.get() requires a callback function but got a [object Object]"}
+Error: Route.get() requires a callback function but got a [object Object]
+    at Route.<computed> [as get] (/Users/shvasa/Downloads/ExamTech/backend/node_modules/express/lib/router/route.js:216:15)
+    at proto.<computed> [as get] (/Users/shvasa/Downloads/ExamTech/backend/node_modules/express/lib/router/index.js:521:19)
+    at Object.<anonymous> (/Users/shvasa/Downloads/ExamTech/backend/routes/analytics.js:13:8)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+2025-07-29 15:45:05 [ERROR]: Uncaught Exception {"service":"examtech-backend","environment":"development","error":"`key_id` or `oauthToken` is mandatory"}
+Error: `key_id` or `oauthToken` is mandatory
+    at new Razorpay (/Users/shvasa/Downloads/ExamTech/backend/node_modules/razorpay/dist/razorpay.js:34:13)
+    at new PaymentService (/Users/shvasa/Downloads/ExamTech/backend/services/paymentService.js:10:21)
+    at Object.<anonymous> (/Users/shvasa/Downloads/ExamTech/backend/services/paymentService.js:402:18)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)

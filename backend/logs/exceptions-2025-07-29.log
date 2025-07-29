@@ -1,0 +1,46 @@
+2025-07-29 15:08:09 [ERROR]: uncaughtException: Route.get() requires a callback function but got a [object Object]
+Error: Route.get() requires a callback function but got a [object Object]
+    at Route.<computed> [as get] (/Users/shvasa/Downloads/ExamTech/backend/node_modules/express/lib/router/route.js:216:15)
+    at proto.<computed> [as get] (/Users/shvasa/Downloads/ExamTech/backend/node_modules/express/lib/router/index.js:521:19)
+    at Object.<anonymous> (/Users/shvasa/Downloads/ExamTech/backend/routes/analytics.js:13:8)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12) {"error":{},"exception":true,"date":"Tue Jul 29 2025 15:08:09 GMT+0530 (India Standard Time)","process":{"pid":60485,"uid":501,"gid":20,"cwd":"/Users/shvasa/Downloads/ExamTech/backend","execPath":"/usr/local/bin/node","version":"v22.15.0","argv":["/usr/local/bin/node","/Users/shvasa/Downloads/ExamTech/backend/server.js"],"memoryUsage":{"rss":100827136,"heapTotal":61112320,"heapUsed":36957392,"external":20478618,"arrayBuffers":18264607}},"os":{"loadavg":[3.1357421875,5.1953125,7.9423828125],"uptime":1030933},"trace":[{"column":15,"file":"/Users/shvasa/Downloads/ExamTech/backend/node_modules/express/lib/router/route.js","function":"Route.<computed> [as get]","line":216,"method":"<computed> [as get]","native":false},{"column":19,"file":"/Users/shvasa/Downloads/ExamTech/backend/node_modules/express/lib/router/index.js","function":"proto.<computed> [as get]","line":521,"method":"<computed> [as get]","native":false},{"column":8,"file":"/Users/shvasa/Downloads/ExamTech/backend/routes/analytics.js","function":null,"line":13,"method":null,"native":false},{"column":14,"file":"node:internal/modules/cjs/loader","function":"Module._compile","line":1730,"method":"_compile","native":false},{"column":10,"file":"node:internal/modules/cjs/loader","function":"Object..js","line":1895,"method":".js","native":false},{"column":32,"file":"node:internal/modules/cjs/loader","function":"Module.load","line":1465,"method":"load","native":false},{"column":12,"file":"node:internal/modules/cjs/loader","function":"Function._load","line":1282,"method":"_load","native":false},{"column":14,"file":"node:diagnostics_channel","function":"TracingChannel.traceSync","line":322,"method":"traceSync","native":false},{"column":24,"file":"node:internal/modules/cjs/loader","function":"wrapModuleLoad","line":235,"method":null,"native":false},{"column":12,"file":"node:internal/modules/cjs/loader","function":"Module.require","line":1487,"method":"require","native":false}],"service":"examtech-backend","environment":"development"}
+Error: Route.get() requires a callback function but got a [object Object]
+    at Route.<computed> [as get] (/Users/shvasa/Downloads/ExamTech/backend/node_modules/express/lib/router/route.js:216:15)
+    at proto.<computed> [as get] (/Users/shvasa/Downloads/ExamTech/backend/node_modules/express/lib/router/index.js:521:19)
+    at Object.<anonymous> (/Users/shvasa/Downloads/ExamTech/backend/routes/analytics.js:13:8)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+2025-07-29 15:45:05 [ERROR]: uncaughtException: `key_id` or `oauthToken` is mandatory
+Error: `key_id` or `oauthToken` is mandatory
+    at new Razorpay (/Users/shvasa/Downloads/ExamTech/backend/node_modules/razorpay/dist/razorpay.js:34:13)
+    at new PaymentService (/Users/shvasa/Downloads/ExamTech/backend/services/paymentService.js:10:21)
+    at Object.<anonymous> (/Users/shvasa/Downloads/ExamTech/backend/services/paymentService.js:402:18)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12) {"error":{},"exception":true,"date":"Tue Jul 29 2025 15:45:05 GMT+0530 (India Standard Time)","process":{"pid":61684,"uid":501,"gid":20,"cwd":"/Users/shvasa/Downloads/ExamTech/backend","execPath":"/usr/local/bin/node","version":"v22.15.0","argv":["/usr/local/bin/node","/Users/shvasa/Downloads/ExamTech/backend/server.js"],"memoryUsage":{"rss":105775104,"heapTotal":62144512,"heapUsed":41063288,"external":21473385,"arrayBuffers":18313664}},"os":{"loadavg":[3.4541015625,6.48583984375,7.44970703125],"uptime":1033149},"trace":[{"column":13,"file":"/Users/shvasa/Downloads/ExamTech/backend/node_modules/razorpay/dist/razorpay.js","function":"new Razorpay","line":34,"method":null,"native":false},{"column":21,"file":"/Users/shvasa/Downloads/ExamTech/backend/services/paymentService.js","function":"new PaymentService","line":10,"method":null,"native":false},{"column":18,"file":"/Users/shvasa/Downloads/ExamTech/backend/services/paymentService.js","function":null,"line":402,"method":null,"native":false},{"column":14,"file":"node:internal/modules/cjs/loader","function":"Module._compile","line":1730,"method":"_compile","native":false},{"column":10,"file":"node:internal/modules/cjs/loader","function":"Object..js","line":1895,"method":".js","native":false},{"column":32,"file":"node:internal/modules/cjs/loader","function":"Module.load","line":1465,"method":"load","native":false},{"column":12,"file":"node:internal/modules/cjs/loader","function":"Function._load","line":1282,"method":"_load","native":false},{"column":14,"file":"node:diagnostics_channel","function":"TracingChannel.traceSync","line":322,"method":"traceSync","native":false},{"column":24,"file":"node:internal/modules/cjs/loader","function":"wrapModuleLoad","line":235,"method":null,"native":false},{"column":12,"file":"node:internal/modules/cjs/loader","function":"Module.require","line":1487,"method":"require","native":false}],"service":"examtech-backend","environment":"development"}
+Error: `key_id` or `oauthToken` is mandatory
+    at new Razorpay (/Users/shvasa/Downloads/ExamTech/backend/node_modules/razorpay/dist/razorpay.js:34:13)
+    at new PaymentService (/Users/shvasa/Downloads/ExamTech/backend/services/paymentService.js:10:21)
+    at Object.<anonymous> (/Users/shvasa/Downloads/ExamTech/backend/services/paymentService.js:402:18)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)

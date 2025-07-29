@@ -1,0 +1,21 @@
+QuestionNumber,QuestionText,QuestionType,Option1,Option2,Option3,Option4,CorrectAnswer,MarksPerQuestion,NegativeMarksPerQuestion,Subject,Topic,Difficulty,Explanation,ImageUrl,Tolerance,PartialScoring,TimeEstimate
+1,"What is the capital of France?",MCQ_Single,Paris,London,Berlin,Madrid,Paris,4,1,Geography,World Capitals,Easy,"Paris is the capital and largest city of France.",,0,false,60
+2,"Which of the following are prime numbers? (Select all that apply)",MCQ_Multiple,2,3,4,5,"2,3,5",4,1,Mathematics,Number Theory,Medium,"2, 3, and 5 are prime numbers. 4 is not prime as it equals 2 × 2.",,0,true,120
+3,"The Earth revolves around the Sun.",TrueFalse,True,False,,,True,4,1,Science,Astronomy,Easy,"The Earth orbits around the Sun in an elliptical path.",,0,false,45
+4,"What is the value of π (pi) to two decimal places?",Numerical,3.14,3.15,3.16,3.17,3.14,4,1,Mathematics,Geometry,Easy,"π is approximately 3.14159, so to two decimal places it's 3.14.",,0.01,false,90
+5,"How many sides does a hexagon have?",Integer,4,5,6,7,6,4,1,Mathematics,Geometry,Easy,"A hexagon is a six-sided polygon.",,0,false,60
+6,"Which programming languages are object-oriented? (Select all that apply)",MCQ_Multiple,Java,Python,C,JavaScript,"Java,Python,JavaScript",4,1,Computer Science,Programming,Medium,"Java, Python, and JavaScript are object-oriented. C is procedural.",,0,true,120
+7,"The speed of light in vacuum is approximately 300,000 km/s.",TrueFalse,True,False,,,True,4,1,Physics,Optics,Medium,"The speed of light in vacuum is exactly 299,792,458 m/s.",,0,false,60
+8,"What is the square root of 144?",Integer,10,11,12,13,12,4,1,Mathematics,Algebra,Easy,"12 × 12 = 144, so the square root of 144 is 12.",,0,false,60
+9,"Calculate the area of a circle with radius 5 units.",Numerical,78.54,78.55,78.56,78.57,78.54,4,1,Mathematics,Geometry,Medium,"Area = πr² = π × 5² = 25π ≈ 78.54 square units.",,0.01,false,120
+10,"Which of the following are valid HTML tags? (Select all that apply)",MCQ_Multiple,<div>,<span>,<section>,<article>,"<div>,<span>,<section>,<article>",4,1,Computer Science,Web Development,Medium,"All of these are valid HTML5 semantic and structural tags.",,0,true,90
+11,"The human body has 206 bones.",TrueFalse,True,False,,,True,4,1,Biology,Anatomy,Medium,"An adult human skeleton typically consists of 206 bones.",,0,false,60
+12,"What is 15% of 200?",Integer,25,30,35,40,30,4,1,Mathematics,Percentages,Easy,"15% of 200 = 0.15 × 200 = 30",,0,false,60
+13,"Solve the equation: 2x + 5 = 13",Integer,3,4,5,6,4,4,1,Mathematics,Algebra,Medium,"2x + 5 = 13 → 2x = 8 → x = 4",,0,false,90
+14,"What is the molecular formula for water?",MCQ_Single,H2O,CO2,O2,N2,H2O,4,1,Chemistry,Chemical Formulas,Easy,"H2O represents two hydrogen atoms bonded to one oxygen atom.",,0,false,60
+15,"Which planets are terrestrial? (Select all that apply)",MCQ_Multiple,Mercury,Venus,Earth,Mars,"Mercury,Venus,Earth,Mars",4,1,Science,Astronomy,Medium,"Terrestrial planets are rocky planets: Mercury, Venus, Earth, and Mars.",,0,true,120
+16,"The Great Wall of China is visible from space with the naked eye.",TrueFalse,True,False,,,False,4,1,Geography,World Landmarks,Medium,"This is a common myth. The Great Wall is not visible from space with the naked eye.",,0,false,60
+17,"What is the value of e (Euler's number) to three decimal places?",Numerical,2.718,2.719,2.720,2.721,2.718,4,1,Mathematics,Calculus,Hard,"e ≈ 2.718281828459...",,0.001,false,90
+18,"How many chromosomes do humans have?",Integer,44,46,48,50,46,4,1,Biology,Genetics,Medium,"Humans have 23 pairs of chromosomes, totaling 46 chromosomes.",,0,false,60
+19,"Which programming paradigms are supported by Python? (Select all that apply)",MCQ_Multiple,Procedural,Object-Oriented,Functional,Logic,"Procedural,Object-Oriented,Functional",4,1,Computer Science,Programming,Hard,"Python supports procedural, object-oriented, and functional programming paradigms.",,0,true,120
+20,"The boiling point of water at sea level is 100°C.",TrueFalse,True,False,,,True,4,1,Chemistry,Physical Chemistry,Easy,"Water boils at 100°C at standard atmospheric pressure (1 atm).",,0,false,60 

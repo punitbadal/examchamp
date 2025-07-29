@@ -1,0 +1,11 @@
+QuestionNumber,QuestionText,QuestionType,Option1,Option2,Option3,Option4,CorrectAnswer,MarksPerQuestion,NegativeMarksPerQuestion,SectionId,Difficulty,Topic,Subject,Explanation,Tags
+1,What is 2+2?,MCQ_Single,3,4,5,6,4,4,1,Math,easy,Arithmetic,Mathematics,Basic addition,math,addition
+2,Which are prime numbers?,MCQ_Multiple,2,3,4,5,"2,3,5",4,2,Math,medium,Number Theory,Mathematics,Prime numbers,math,prime
+3,Is 7 a prime number?,TrueFalse,True,False,,,True,2,1,Math,easy,Number Theory,Mathematics,Prime number check,math,prime
+4,What is the square root of 16?,Integer,,,,,4,4,1,Math,easy,Algebra,Mathematics,Square root,math,algebra
+5,What is 3.14 rounded to 2 decimal places?,Numerical,,,,,3.14,4,1,Math,easy,Geometry,Mathematics,Pi approximation,math,geometry
+6,What is the capital of France?,MCQ_Single,London,Berlin,Paris,Madrid,Paris,2,1,Geography,easy,Countries,Geography,Capital of France,geography,countries
+7,Which countries are in Europe?,MCQ_Multiple,France,Germany,Japan,Italy,"France,Germany,Italy",3,1,Geography,medium,Continents,Geography,European countries,geography,europe
+8,Is Earth round?,TrueFalse,True,False,,,True,2,1,Geography,easy,Planets,Geography,Basic geography,geography,earth
+9,What is the population of Tokyo (in millions)?,Integer,,,,,37,3,1,Geography,medium,Cities,Geography,Tokyo population,geography,cities
+10,What is the area of a circle with radius 5?,Numerical,,,,,78.54,4,1,Math,medium,Geometry,Mathematics,Circle area formula,math,geometry 
