@@ -4,9 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrophyIcon,
-  MedalIcon,
   StarIcon,
-  TrendingUpIcon,
+  ArrowTrendingUpIcon,
   UserIcon,
   AcademicCapIcon,
   ClockIcon,
@@ -192,9 +191,9 @@ export default function Leaderboard({
       case 1:
         return <TrophyIcon className="h-6 w-6 text-yellow-500" />;
       case 2:
-        return <MedalIcon className="h-6 w-6 text-gray-400" />;
+        return <TrophyIcon className="h-6 w-6 text-gray-400" />;
       case 3:
-        return <MedalIcon className="h-6 w-6 text-amber-600" />;
+        return <TrophyIcon className="h-6 w-6 text-amber-600" />;
       default:
         return <span className="text-lg font-bold text-gray-600">{rank}</span>;
     }
@@ -202,10 +201,10 @@ export default function Leaderboard({
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
-      case 'up':
-        return <TrendingUpIcon className="h-4 w-4 text-green-500" />;
-      case 'down':
-        return <TrendingUpIcon className="h-4 w-4 text-red-500 transform rotate-180" />;
+          case 'up':
+      return <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />;
+    case 'down':
+      return <ArrowTrendingUpIcon className="h-4 w-4 text-red-500 transform rotate-180" />;
       default:
         return <div className="h-4 w-4" />;
     }
@@ -216,9 +215,9 @@ export default function Leaderboard({
       case 'gold':
         return <TrophyIcon className="h-4 w-4 text-yellow-500" />;
       case 'silver':
-        return <MedalIcon className="h-4 w-4 text-gray-400" />;
+        return <TrophyIcon className="h-4 w-4 text-gray-400" />;
       case 'bronze':
-        return <MedalIcon className="h-4 w-4 text-amber-600" />;
+        return <TrophyIcon className="h-4 w-4 text-amber-600" />;
       case 'speed':
         return <ClockIcon className="h-4 w-4 text-blue-500" />;
       case 'accuracy':
@@ -226,7 +225,7 @@ export default function Leaderboard({
       case 'consistency':
         return <StarIcon className="h-4 w-4 text-purple-500" />;
       case 'improvement':
-        return <TrendingUpIcon className="h-4 w-4 text-orange-500" />;
+        return <ArrowTrendingUpIcon className="h-4 w-4 text-orange-500" />;
       default:
         return null;
     }

@@ -4,662 +4,612 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   BookOpenIcon,
-  PlayIcon,
   DocumentTextIcon,
-  AcademicCapIcon,
+  VideoCameraIcon,
+  PhotoIcon,
+  LinkIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-  ArrowDownTrayIcon,
+  Bars3Icon,
   EyeIcon,
+  PencilIcon,
+  TrashIcon,
+  ArrowDownTrayIcon,
+  ShareIcon,
   StarIcon,
-  ClockIcon,
-  UserIcon,
   CalendarIcon,
+  UserIcon,
   TagIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  FolderPlusIcon,
+  PresentationChartBarIcon,
+  AcademicCapIcon,
+  PlayIcon,
+  ClockIcon,
+  TrophyIcon
 } from '@heroicons/react/24/outline';
-import { toast } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 interface StudyMaterial {
   id: string;
   title: string;
-  type: 'notes' | 'video' | 'paper' | 'formula' | 'summary';
+  type: 'pdf' | 'video' | 'article' | 'presentation' | 'formula_sheet' | 'notes' | 'previous_papers';
+  category: string;
   subject: string;
-  topic: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  duration?: number; // for videos
-  pages?: number; // for documents
-  author: string;
-  rating: number;
-  downloads: number;
-  views: number;
-  createdAt: string;
-  tags: string[];
   description: string;
-  thumbnail?: string;
-  fileUrl?: string;
-  videoUrl?: string;
+  fileSize: string;
+  uploadDate: Date;
+  views: number;
+  downloads: number;
   isPremium: boolean;
+  status: 'draft' | 'published' | 'archived';
+  rating: number;
+  ratingCount: number;
+  duration?: number;
+}
+
+interface PracticeTest {
+  id: string;
+  title: string;
+  type: 'topic_quiz' | 'chapter_test' | 'subject_test' | 'mock_exam' | 'custom';
+  level: string;
+  subject: string;
+  description: string;
+  questionCount: number;
+  timeLimit: number;
+  passingScore: number;
+  totalMarks: number;
+  attempts: number;
+  averageScore: number;
+  isPremium: boolean;
+  status: 'draft' | 'published' | 'archived';
 }
 
 interface Subject {
   id: string;
   name: string;
-  icon: string;
-  color: string;
-  topics: string[];
+  materialCount: number;
+  testCount: number;
 }
 
 export default function ContentLibrary() {
+  const [activeTab, setActiveTab] = useState<'materials' | 'tests'>('materials');
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
-  const [filteredMaterials, setFilteredMaterials] = useState<StudyMaterial[]>([]);
+  const [practiceTests, setPracticeTests] = useState<PracticeTest[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSubject, setSelectedSubject] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedType, setSelectedType] = useState('');
-  const [selectedDifficulty, setSelectedDifficulty] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'rating'>('recent');
   const [showFilters, setShowFilters] = useState(false);
 
-  const subjects: Subject[] = [
-    { id: 'physics', name: 'Physics', icon: '⚡', color: 'blue', topics: ['Mechanics', 'Thermodynamics', 'Electromagnetism', 'Optics', 'Modern Physics'] },
-    { id: 'chemistry', name: 'Chemistry', icon: '🧪', color: 'green', topics: ['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry', 'Analytical Chemistry'] },
-    { id: 'mathematics', name: 'Mathematics', icon: '📐', color: 'purple', topics: ['Algebra', 'Calculus', 'Geometry', 'Trigonometry', 'Statistics'] },
-    { id: 'biology', name: 'Biology', icon: '🧬', color: 'emerald', topics: ['Botany', 'Zoology', 'Human Physiology', 'Genetics', 'Ecology'] }
-  ];
-
-  const materialTypes = [
-    { value: 'notes', label: 'Notes', icon: DocumentTextIcon },
-    { value: 'video', label: 'Videos', icon: PlayIcon },
-    { value: 'paper', label: 'Previous Papers', icon: BookOpenIcon },
-    { value: 'formula', label: 'Formula Sheets', icon: AcademicCapIcon },
-    { value: 'summary', label: 'Summaries', icon: DocumentTextIcon }
-  ];
-
-  const difficulties = [
-    { value: 'beginner', label: 'Beginner', color: 'green' },
-    { value: 'intermediate', label: 'Intermediate', color: 'yellow' },
-    { value: 'advanced', label: 'Advanced', color: 'red' }
-  ];
-
   useEffect(() => {
-    loadStudyMaterials();
+    loadContent();
   }, []);
 
-  useEffect(() => {
-    filterMaterials();
-  }, [materials, searchTerm, selectedSubject, selectedType, selectedDifficulty, sortBy, sortOrder]);
-
-  const loadStudyMaterials = async () => {
+  const loadContent = async () => {
     try {
       setLoading(true);
       // Mock data - in real app, fetch from API
       const mockMaterials: StudyMaterial[] = [
         {
           id: '1',
-          title: 'Complete Mechanics Notes - JEE Main',
-          type: 'notes',
-          subject: 'physics',
-          topic: 'Mechanics',
-          difficulty: 'intermediate',
-          pages: 45,
-          author: 'Dr. Rajesh Kumar',
-          rating: 4.8,
-          downloads: 1250,
-          views: 3400,
-          createdAt: '2024-01-15',
-          tags: ['mechanics', 'jee', 'physics', 'kinematics'],
-          description: 'Comprehensive notes covering all mechanics topics for JEE Main preparation.',
-          isPremium: false
+          title: 'JEE Main Physics Formula Sheet',
+          type: 'formula_sheet',
+          category: 'Formula Sheets',
+          subject: 'Physics',
+          description: 'Comprehensive formula sheet for JEE Main Physics preparation',
+          fileSize: '2.5 MB',
+          uploadDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+          views: 1247,
+          downloads: 892,
+          isPremium: false,
+          status: 'published',
+          rating: 4.5,
+          ratingCount: 156
         },
         {
           id: '2',
-          title: 'Organic Chemistry Video Series',
+          title: 'NEET Biology Video Series',
           type: 'video',
-          subject: 'chemistry',
-          topic: 'Organic Chemistry',
-          difficulty: 'advanced',
-          duration: 180,
-          author: 'Prof. Priya Sharma',
-          rating: 4.9,
+          category: 'Video Lectures',
+          subject: 'Biology',
+          description: 'Complete video series covering NEET Biology syllabus',
+          fileSize: '156 MB',
+          uploadDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+          views: 2341,
           downloads: 0,
-          views: 8900,
-          createdAt: '2024-01-10',
-          tags: ['organic', 'chemistry', 'jee', 'reactions'],
-          description: 'Complete video series on organic chemistry reactions and mechanisms.',
-          videoUrl: 'https://example.com/video1',
-          isPremium: true
+          isPremium: true,
+          status: 'published',
+          rating: 4.8,
+          ratingCount: 89,
+          duration: 180
         },
         {
           id: '3',
-          title: 'JEE Main 2023 Physics Paper',
-          type: 'paper',
-          subject: 'physics',
-          topic: 'Previous Papers',
-          difficulty: 'intermediate',
-          author: 'NTA',
-          rating: 4.7,
-          downloads: 2100,
-          views: 5600,
-          createdAt: '2024-01-05',
-          tags: ['jee', '2023', 'physics', 'paper'],
-          description: 'Complete JEE Main 2023 Physics question paper with solutions.',
-          fileUrl: 'https://example.com/paper1.pdf',
-          isPremium: false
+          title: 'Chemistry Study Notes - Organic Chemistry',
+          type: 'notes',
+          category: 'Study Notes',
+          subject: 'Chemistry',
+          description: 'Detailed notes on Organic Chemistry for JEE preparation',
+          fileSize: '1.8 MB',
+          uploadDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+          views: 567,
+          downloads: 234,
+          isPremium: false,
+          status: 'published',
+          rating: 4.2,
+          ratingCount: 45
         },
         {
           id: '4',
-          title: 'Calculus Formula Sheet',
-          type: 'formula',
-          subject: 'mathematics',
-          topic: 'Calculus',
-          difficulty: 'beginner',
-          author: 'Math Academy',
+          title: 'Mathematics Previous Year Papers',
+          type: 'previous_papers',
+          category: 'Previous Papers',
+          subject: 'Mathematics',
+          description: 'Collection of previous year JEE Mathematics papers with solutions',
+          fileSize: '5.2 MB',
+          uploadDate: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000),
+          views: 1890,
+          downloads: 1200,
+          isPremium: true,
+          status: 'published',
           rating: 4.6,
-          downloads: 3200,
-          views: 7800,
-          createdAt: '2024-01-20',
-          tags: ['calculus', 'formulas', 'math', 'jee'],
-          description: 'Quick reference formula sheet for calculus topics.',
-          isPremium: false
-        },
-        {
-          id: '5',
-          title: 'Biology Chapter Summary',
-          type: 'summary',
-          subject: 'biology',
-          topic: 'Human Physiology',
-          difficulty: 'intermediate',
-          author: 'Dr. Amit Patel',
-          rating: 4.5,
-          downloads: 890,
-          views: 2100,
-          createdAt: '2024-01-12',
-          tags: ['biology', 'physiology', 'summary', 'neet'],
-          description: 'Concise summary of human physiology chapters for NEET preparation.',
-          isPremium: false
+          ratingCount: 234
         }
       ];
 
+      const mockPracticeTests: PracticeTest[] = [
+        {
+          id: '1',
+          title: 'JEE Physics - Mechanics Quiz',
+          type: 'topic_quiz',
+          level: 'Intermediate',
+          subject: 'Physics',
+          description: 'Practice test covering mechanics topics for JEE preparation',
+          questionCount: 25,
+          timeLimit: 60,
+          passingScore: 60,
+          totalMarks: 100,
+          attempts: 156,
+          averageScore: 72.5,
+          isPremium: false,
+          status: 'published'
+        },
+        {
+          id: '2',
+          title: 'NEET Biology - Human Physiology',
+          type: 'chapter_test',
+          level: 'Advanced',
+          subject: 'Biology',
+          description: 'Comprehensive test on human physiology for NEET',
+          questionCount: 40,
+          timeLimit: 90,
+          passingScore: 70,
+          totalMarks: 160,
+          attempts: 89,
+          averageScore: 68.3,
+          isPremium: true,
+          status: 'published'
+        },
+        {
+          id: '3',
+          title: 'GATE CS - Data Structures',
+          type: 'subject_test',
+          level: 'Expert',
+          subject: 'Computer Science',
+          description: 'Advanced practice test on data structures for GATE',
+          questionCount: 30,
+          timeLimit: 120,
+          passingScore: 65,
+          totalMarks: 120,
+          attempts: 234,
+          averageScore: 75.8,
+          isPremium: true,
+          status: 'published'
+        }
+      ];
+
+      const mockSubjects: Subject[] = [
+        { id: '1', name: 'Physics', materialCount: 15, testCount: 8 },
+        { id: '2', name: 'Chemistry', materialCount: 12, testCount: 6 },
+        { id: '3', name: 'Mathematics', materialCount: 18, testCount: 10 },
+        { id: '4', name: 'Biology', materialCount: 9, testCount: 4 },
+        { id: '5', name: 'Computer Science', materialCount: 6, testCount: 3 }
+      ];
+
       setMaterials(mockMaterials);
+      setPracticeTests(mockPracticeTests);
+      setSubjects(mockSubjects);
     } catch (error) {
-      console.error('Error loading study materials:', error);
-      toast.error('Failed to load study materials');
+      console.error('Error loading content:', error);
+      toast.error('Failed to load content');
     } finally {
       setLoading(false);
     }
   };
 
-  const filterMaterials = () => {
-    let filtered = [...materials];
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(material =>
-        material.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        material.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        material.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    }
-
-    // Subject filter
-    if (selectedSubject) {
-      filtered = filtered.filter(material => material.subject === selectedSubject);
-    }
-
-    // Type filter
-    if (selectedType) {
-      filtered = filtered.filter(material => material.type === selectedType);
-    }
-
-    // Difficulty filter
-    if (selectedDifficulty) {
-      filtered = filtered.filter(material => material.difficulty === selectedDifficulty);
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      let aValue, bValue;
-      
-      switch (sortBy) {
-        case 'title':
-          aValue = a.title;
-          bValue = b.title;
-          break;
-        case 'rating':
-          aValue = a.rating;
-          bValue = b.rating;
-          break;
-        case 'downloads':
-          aValue = a.downloads;
-          bValue = b.downloads;
-          break;
-        case 'views':
-          aValue = a.views;
-          bValue = b.views;
-          break;
-        case 'createdAt':
-        default:
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
-          break;
-      }
-
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-
-    setFilteredMaterials(filtered);
-  };
-
-  const handleDownload = (material: StudyMaterial) => {
-    if (material.isPremium) {
-      toast.error('This is a premium material. Please upgrade to access.');
-      return;
-    }
-    
-    toast.success('Download started...');
-    // In real app, trigger actual download
-  };
-
-  const handleView = (material: StudyMaterial) => {
-    if (material.type === 'video') {
-      window.open(material.videoUrl, '_blank');
-    } else if (material.fileUrl) {
-      window.open(material.fileUrl, '_blank');
-    } else {
-      toast('Preview not available for this material');
-    }
-  };
-
   const getTypeIcon = (type: string) => {
-    const typeConfig = materialTypes.find(t => t.value === type);
-    return typeConfig ? typeConfig.icon : DocumentTextIcon;
+    switch (type) {
+      case 'video':
+        return VideoCameraIcon;
+      case 'pdf':
+      case 'article':
+      case 'notes':
+      case 'formula_sheet':
+      case 'previous_papers':
+        return DocumentTextIcon;
+      case 'presentation':
+        return PresentationChartBarIcon;
+      default:
+        return DocumentTextIcon;
+    }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    const diffConfig = difficulties.find(d => d.value === difficulty);
-    return diffConfig ? diffConfig.color : 'gray';
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'video':
+        return 'bg-red-100 text-red-600';
+      case 'pdf':
+      case 'article':
+      case 'notes':
+        return 'bg-blue-100 text-blue-600';
+      case 'formula_sheet':
+        return 'bg-green-100 text-green-600';
+      case 'previous_papers':
+        return 'bg-purple-100 text-purple-600';
+      case 'presentation':
+        return 'bg-orange-100 text-orange-600';
+      default:
+        return 'bg-gray-100 text-gray-600';
+    }
   };
 
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const handleDownload = async (material: StudyMaterial) => {
+    try {
+      // In a real app, this would make an API call to download the file
+      console.log('Downloading:', material.title);
+      toast.success('Download started!');
+    } catch (error) {
+      console.error('Error downloading:', error);
+      toast.error('Download failed');
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+  const handleView = async (material: StudyMaterial) => {
+    try {
+      // In a real app, this would open the material in a viewer
+      console.log('Viewing:', material.title);
+      toast.success('Opening material...');
+    } catch (error) {
+      console.error('Error viewing:', error);
+      toast.error('Failed to open material');
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Study Materials Library
-            </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Access comprehensive study materials, video lectures, previous year papers, 
-              and formula sheets to enhance your exam preparation.
-            </p>
+  const handleStartTest = async (test: PracticeTest) => {
+    try {
+      // In a real app, this would navigate to the test interface
+      console.log('Starting test:', test.title);
+      toast.success('Starting test...');
+      // Navigate to test page
+      window.location.href = `/practice/${test.id}`;
+    } catch (error) {
+      console.error('Error starting test:', error);
+      toast.error('Failed to start test');
+    }
+  };
+
+  const filteredMaterials = materials.filter(material => {
+    const matchesSubject = selectedSubject === 'all' || material.subject === selectedSubject;
+    const matchesCategory = selectedCategory === 'all' || material.category === selectedCategory;
+    const matchesSearch = material.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         material.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSubject && matchesCategory && matchesSearch;
+  });
+
+  const filteredTests = practiceTests.filter(test => {
+    const matchesSubject = selectedSubject === 'all' || test.subject === selectedSubject;
+    const matchesSearch = test.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         test.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSubject && matchesSearch;
+  });
+
+  const renderMaterials = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Study Materials</h2>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search materials..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            <FunnelIcon className="h-4 w-4" />
+            <span>Filters</span>
+          </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search study materials..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap gap-3">
-              {/* Subject Filter */}
+      {showFilters && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="bg-white p-4 rounded-lg border border-gray-200"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
               <select
                 value={selectedSubject}
                 onChange={(e) => setSelectedSubject(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">All Subjects</option>
-                {subjects.map((subject) => (
-                  <option key={subject.id} value={subject.id}>
-                    {subject.name}
-                  </option>
+                <option value="all">All Subjects</option>
+                {subjects.map(subject => (
+                  <option key={subject.id} value={subject.name}>{subject.name}</option>
                 ))}
               </select>
-
-              {/* Type Filter */}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
               <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">All Types</option>
-                {materialTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
+                <option value="all">All Categories</option>
+                <option value="Formula Sheets">Formula Sheets</option>
+                <option value="Video Lectures">Video Lectures</option>
+                <option value="Study Notes">Study Notes</option>
+                <option value="Previous Papers">Previous Papers</option>
+                <option value="Practice Questions">Practice Questions</option>
               </select>
-
-              {/* Difficulty Filter */}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
               <select
-                value={selectedDifficulty}
-                onChange={(e) => setSelectedDifficulty(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">All Levels</option>
-                {difficulties.map((difficulty) => (
-                  <option key={difficulty.value} value={difficulty.value}>
-                    {difficulty.label}
-                  </option>
-                ))}
+                <option value="recent">Most Recent</option>
+                <option value="popular">Most Popular</option>
+                <option value="rating">Highest Rated</option>
               </select>
-
-              {/* Sort */}
-              <select
-                value={`${sortBy}-${sortOrder}`}
-                onChange={(e) => {
-                  const [sort, order] = e.target.value.split('-');
-                  setSortBy(sort);
-                  setSortOrder(order);
-                }}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="createdAt-desc">Latest</option>
-                <option value="rating-desc">Highest Rated</option>
-                <option value="downloads-desc">Most Downloaded</option>
-                <option value="views-desc">Most Viewed</option>
-                <option value="title-asc">Name A-Z</option>
-              </select>
-
-              {/* Advanced Filters Toggle */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <FunnelIcon className="h-4 w-4 mr-1" />
-                Filters
-                {showFilters ? (
-                  <ChevronUpIcon className="h-4 w-4 ml-1" />
-                ) : (
-                  <ChevronDownIcon className="h-4 w-4 ml-1" />
-                )}
-              </button>
             </div>
           </div>
+        </motion.div>
+      )}
 
-          {/* Advanced Filters */}
-          {showFilters && (
+      {/* Materials Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredMaterials.map((material) => {
+          const Icon = getTypeIcon(material.type);
+          return (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 pt-4 border-t border-gray-200"
+              key={material.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow"
             >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Author</label>
-                  <input
-                    type="text"
-                    placeholder="Search by author..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg ${getTypeColor(material.type)}`}>
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{material.title}</h3>
+                      <p className="text-sm text-gray-600">{material.subject}</p>
+                    </div>
+                  </div>
+                  {material.isPremium && (
+                    <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                      Premium
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <option>All Time</option>
-                    <option>Last Week</option>
-                    <option>Last Month</option>
-                    <option>Last 3 Months</option>
-                    <option>Last Year</option>
-                  </select>
+
+                <p className="text-sm text-gray-600 mb-4">{material.description}</p>
+
+                <div className="space-y-2 text-sm text-gray-500 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span>Category</span>
+                    <span className="font-medium">{material.category}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>File Size</span>
+                    <span className="font-medium">{material.fileSize}</span>
+                  </div>
+                  {material.duration && (
+                    <div className="flex items-center justify-between">
+                      <span>Duration</span>
+                      <span className="font-medium">{material.duration} min</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span>Rating</span>
+                    <div className="flex items-center space-x-1">
+                      <StarIcon className="h-4 w-4 text-yellow-400" />
+                      <span className="font-medium">{material.rating}</span>
+                      <span className="text-gray-400">({material.ratingCount})</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <option>All Ratings</option>
-                    <option>4+ Stars</option>
-                    <option>3+ Stars</option>
-                    <option>2+ Stars</option>
-                  </select>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleView(material)}
+                    className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 text-sm"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => handleDownload(material)}
+                    className="flex-1 px-3 py-2 bg-green-100 text-green-700 rounded-md hover:bg-green-200 text-sm"
+                  >
+                    Download
+                  </button>
                 </div>
               </div>
             </motion.div>
-          )}
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderPracticeTests = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Practice Tests</h2>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search tests..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Materials Grid */}
+      {/* Tests Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredTests.map((test) => (
+          <motion.div
+            key={test.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow"
+          >
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <DocumentTextIcon className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{test.title}</h3>
+                    <p className="text-sm text-gray-600">{test.subject}</p>
+                  </div>
+                </div>
+                {test.isPremium && (
+                  <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                    Premium
+                  </span>
+                )}
+              </div>
+
+              <p className="text-sm text-gray-600 mb-4">{test.description}</p>
+
+              <div className="space-y-2 text-sm text-gray-500 mb-4">
+                <div className="flex items-center justify-between">
+                  <span>Questions</span>
+                  <span className="font-medium">{test.questionCount}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Time Limit</span>
+                  <span className="font-medium">{test.timeLimit} min</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Total Marks</span>
+                  <span className="font-medium">{test.totalMarks}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Attempts</span>
+                  <span className="font-medium">{test.attempts}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Avg Score</span>
+                  <span className="font-medium">{test.averageScore}%</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleStartTest(test)}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+              >
+                Start Test
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <BookOpenIcon className="h-8 w-8 text-blue-600" />
+              <span className="ml-2 text-xl font-bold text-gray-900">Content Library</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex space-x-8">
+            {[
+              { id: 'materials', name: 'Study Materials', icon: BookOpenIcon },
+              { id: 'tests', name: 'Practice Tests', icon: DocumentTextIcon }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{tab.name}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+
+      {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-sm border animate-pulse">
-                <div className="h-48 bg-gray-200 rounded-t-lg"></div>
-                <div className="p-6">
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded mb-4"></div>
-                  <div className="flex gap-2 mb-4">
-                    <div className="h-6 w-16 bg-gray-200 rounded"></div>
-                    <div className="h-6 w-20 bg-gray-200 rounded"></div>
-                  </div>
-                  <div className="h-10 bg-gray-200 rounded"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filteredMaterials.length === 0 ? (
-          <div className="text-center py-12">
-            <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No materials found</h3>
-            <p className="text-gray-600">Try adjusting your search criteria or filters.</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMaterials.map((material, index) => {
-                const TypeIcon = getTypeIcon(material.type);
-                const subject = subjects.find(s => s.id === material.subject);
-                
-                return (
-                  <motion.div
-                    key={material.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow duration-200"
-                  >
-                    {/* Material Thumbnail */}
-                    <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600 rounded-t-lg">
-                      <div className="flex items-center justify-center h-full">
-                        <TypeIcon className="h-16 w-16 text-white opacity-80" />
-                      </div>
-                      
-                      {/* Type Badge */}
-                      <div className="absolute top-3 left-3">
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-white bg-opacity-90 text-gray-800">
-                          {materialTypes.find(t => t.value === material.type)?.label}
-                        </span>
-                      </div>
-
-                      {/* Subject Badge */}
-                      <div className="absolute top-3 right-3">
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-white bg-opacity-90 text-gray-800">
-                          {subject?.name}
-                        </span>
-                      </div>
-
-                      {/* Premium Badge */}
-                      {material.isPremium && (
-                        <div className="absolute bottom-3 left-3">
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-400 text-yellow-900">
-                            Premium
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Difficulty Badge */}
-                      <div className="absolute bottom-3 right-3">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full bg-${getDifficultyColor(material.difficulty)}-100 text-${getDifficultyColor(material.difficulty)}-800`}>
-                          {material.difficulty}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Material Content */}
-                    <div className="p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                        {material.title}
-                      </h3>
-                      
-                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                        {material.description}
-                      </p>
-
-                      {/* Material Stats */}
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Author:</span>
-                          <span className="font-medium">{material.author}</span>
-                        </div>
-                        {material.duration && (
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-500">Duration:</span>
-                            <span className="font-medium">{formatDuration(material.duration)}</span>
-                          </div>
-                        )}
-                        {material.pages && (
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-500">Pages:</span>
-                            <span className="font-medium">{material.pages}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Topic:</span>
-                          <span className="font-medium">{material.topic}</span>
-                        </div>
-                      </div>
-
-                      {/* Rating and Stats */}
-                      <div className="space-y-2 mb-4 p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Rating:</span>
-                          <div className="flex items-center">
-                            <StarIcon className="h-4 w-4 text-yellow-400 mr-1" />
-                            <span className="font-medium">{material.rating}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Downloads:</span>
-                          <span className="font-medium">{material.downloads.toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Views:</span>
-                          <span className="font-medium">{material.views.toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-1 mb-4">
-                        {material.tags.slice(0, 3).map((tag, tagIndex) => (
-                          <span
-                            key={tagIndex}
-                            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {material.tags.length > 3 && (
-                          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
-                            +{material.tags.length - 3} more
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center text-xs text-gray-500">
-                          <CalendarIcon className="h-3 w-3 mr-1" />
-                          {formatDate(material.createdAt)}
-                        </div>
-
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleView(material)}
-                            className="flex items-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                          >
-                            <EyeIcon className="h-3 w-3 mr-1" />
-                            View
-                          </button>
-                          <button
-                            onClick={() => handleDownload(material)}
-                            className="flex items-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
-                          >
-                            <ArrowDownTrayIcon className="h-3 w-3 mr-1" />
-                            Download
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-
-            {/* Stats */}
-            <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Library Statistics</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{materials.length}</div>
-                  <div className="text-sm text-gray-600">Total Materials</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {materials.filter(m => m.type === 'video').length}
-                  </div>
-                  <div className="text-sm text-gray-600">Video Lectures</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {materials.filter(m => m.type === 'paper').length}
-                  </div>
-                  <div className="text-sm text-gray-600">Previous Papers</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">
-                    {materials.reduce((sum, m) => sum + m.downloads, 0).toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-600">Total Downloads</div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        {activeTab === 'materials' && renderMaterials()}
+        {activeTab === 'tests' && renderPracticeTests()}
       </div>
     </div>
   );

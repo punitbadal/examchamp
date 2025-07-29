@@ -143,15 +143,16 @@ app.get('/metrics', (req, res) => {
 
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
-// app.use('/api/exams', require('./routes/exams')); // Temporarily disabled
-// app.use('/api/questions', require('./routes/questions')); // Temporarily disabled
-// app.use('/api/results', require('./routes/results')); // Temporarily disabled
-// app.use('/api/users', require('./routes/users')); // Temporarily disabled
-// app.use('/api/analytics', require('./routes/analytics')); // Temporarily disabled
+app.use('/api/exams', require('./routes/exams'));
+app.use('/api/questions', require('./routes/questions'));
+app.use('/api/results', require('./routes/results'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/proctoring', require('./routes/proctoring'));
-// app.use('/api/payments', require('./routes/payments')); // Temporarily disabled
-// app.use('/api/courses', require('./routes/courses')); // Temporarily disabled
-// app.use('/api/practice-tests', require('./routes/practice-tests')); // Temporarily disabled
+app.use('/api/payments', require('./routes/payments'));
+app.use('/api/courses', require('./routes/courses'));
+app.use('/api/practice-tests', require('./routes/practice-tests'));
+app.use('/api/study-materials', require('./routes/study-materials'));
 
 // Socket.IO authentication middleware
 // Temporarily disabled

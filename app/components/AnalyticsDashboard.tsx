@@ -4,11 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   ChartBarIcon,
-  TrendingUpIcon,
+  ArrowTrendingUpIcon,
   AcademicCapIcon,
   ClockIcon,
   StarIcon,
-  TargetIcon,
+  TagIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XCircleIcon,
@@ -532,7 +532,7 @@ export default function AnalyticsDashboard({
       {/* Recommendations */}
       <div className="bg-white rounded-lg shadow-sm border p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <TargetIcon className="h-5 w-5 text-blue-500 mr-2" />
+                          <TagIcon className="h-5 w-5 text-blue-500 mr-2" />
           Personalized Recommendations
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -544,7 +544,7 @@ export default function AnalyticsDashboard({
               transition={{ delay: index * 0.1 }}
               className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg"
             >
-              <TargetIcon className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                              <TagIcon className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-blue-800">{recommendation}</p>
             </motion.div>
           ))}

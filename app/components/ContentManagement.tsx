@@ -6,21 +6,21 @@ import {
   BookOpenIcon,
   PlayIcon,
   DocumentTextIcon,
+  VideoCameraIcon,
   AcademicCapIcon,
   PlusIcon,
-  UploadIcon,
+  ArrowUpTrayIcon,
   FolderIcon,
-  VideoCameraIcon,
   DocumentIcon,
-  ImageIcon,
+  PhotoIcon,
   LinkIcon,
-  SearchIcon,
-  FilterIcon,
-  SortAscendingIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  Bars3Icon,
   EyeIcon,
-  EditIcon,
+  PencilIcon,
   TrashIcon,
-  DownloadIcon,
+  ArrowDownTrayIcon,
   ShareIcon,
   StarIcon,
   CalendarIcon,
@@ -29,8 +29,6 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   FolderPlusIcon,
-  VideoIcon,
-  FileTextIcon,
   PresentationChartBarIcon
 } from '@heroicons/react/24/outline';
 
@@ -86,7 +84,7 @@ export default function ContentManagement({
   const [content, setContent] = useState<ContentItem[]>([]);
   const [folders, setFolders] = useState<ContentFolder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'videos' | 'documents' | 'images' | 'links'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'video' | 'document' | 'image' | 'link'>('all');
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('uploadDate');
@@ -238,11 +236,11 @@ export default function ContentManagement({
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'video':
-        return VideoIcon;
+        return VideoCameraIcon;
       case 'document':
         return DocumentTextIcon;
       case 'image':
-        return ImageIcon;
+        return PhotoIcon;
       case 'link':
         return LinkIcon;
       case 'presentation':
@@ -356,7 +354,7 @@ export default function ContentManagement({
               onClick={handleUpload}
               className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              <UploadIcon className="h-4 w-4" />
+                              <ArrowUpTrayIcon className="h-4 w-4" />
               <span>Upload Content</span>
             </button>
           )}
@@ -368,7 +366,7 @@ export default function ContentManagement({
         <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
           {/* Search */}
           <div className="relative flex-1 max-w-md">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
               placeholder="Search content..."
@@ -430,7 +428,7 @@ export default function ContentManagement({
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
-              <FilterIcon className="h-4 w-4 mr-1" />
+                              <FunnelIcon className="h-4 w-4 mr-1" />
               Filters
               {showFilters ? (
                 <ChevronUpIcon className="h-4 w-4 ml-1" />
@@ -617,7 +615,7 @@ export default function ContentManagement({
                         <span>{item.views}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <DownloadIcon className="h-3 w-3" />
+                        <ArrowDownTrayIcon className="h-3 w-3" />
                         <span>{item.downloads}</span>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -655,7 +653,7 @@ export default function ContentManagement({
                           <EyeIcon className="h-4 w-4" />
                         </button>
                         <button className="p-1 text-gray-400 hover:text-gray-600">
-                          <EditIcon className="h-4 w-4" />
+                          <PencilIcon className="h-4 w-4" />
                         </button>
                         <button className="p-1 text-gray-400 hover:text-red-600">
                           <TrashIcon className="h-4 w-4" />
