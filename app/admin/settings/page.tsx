@@ -61,8 +61,21 @@ export default function SettingsPage() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, fetch from API
-      // Settings are already initialized above
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSettings(data.settings);
+      } else {
+        console.error('Failed to fetch settings');
+        // Settings are already initialized above as fallback
+      }
     } catch (error) {
       console.error('Error fetching settings:', error);
     } finally {
@@ -70,11 +83,29 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSettingChange = (key: keyof SystemSettings, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
+  const handleSettingChange = async (key: keyof SystemSettings, value: any) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ [key]: value })
+      });
+
+      if (response.ok) {
+        setSettings(prev => ({
+          ...prev,
+          [key]: value
+        }));
+      } else {
+        console.error('Failed to update setting');
+      }
+    } catch (error) {
+      console.error('Error updating setting:', error);
+    }
   };
 
   const formatDate = (date: Date) => {

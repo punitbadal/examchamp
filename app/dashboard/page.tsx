@@ -42,6 +42,10 @@ interface Exam {
   endTime: string;
   status: 'upcoming' | 'active' | 'completed' | 'expired';
   isLive: boolean;
+  isPaid: boolean;
+  price: number;
+  currency: string;
+  hasAccess: boolean;
 }
 
 interface PracticeTest {
@@ -60,6 +64,8 @@ export default function StudentDashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'exams' | 'practice' | 'results' | 'analytics' | 'leaderboard'>('overview');
+  const [upcomingExams, setUpcomingExams] = useState<Exam[]>([]);
+  const [practiceTests, setPracticeTests] = useState<PracticeTest[]>([]);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -81,6 +87,7 @@ export default function StudentDashboard() {
       }
       
       setUser(user);
+      fetchDashboardData();
     } catch (error) {
       console.error('Error parsing user data:', error);
       router.push('/');
@@ -88,6 +95,104 @@ export default function StudentDashboard() {
       setLoading(false);
     }
   }, [router]);
+
+  const fetchDashboardData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Fetch upcoming exams
+      const examsResponse = await fetch('/api/exams?status=upcoming', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (examsResponse.ok) {
+        const examsData = await examsResponse.json();
+        setUpcomingExams(examsData.exams || []);
+      }
+
+      // Fetch practice tests
+      const testsResponse = await fetch('/api/practice-tests?status=published', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (testsResponse.ok) {
+        const testsData = await testsResponse.json();
+        setPracticeTests(testsData.tests || []);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      // Mock data for upcoming exams
+      const mockExams: Exam[] = [
+        {
+          id: '1',
+          title: 'JEE Main Mock Test 1',
+          examCode: 'JEE001',
+          subject: 'Physics, Chemistry, Mathematics',
+          duration: 180,
+          totalMarks: 300,
+          startTime: '2025-07-30T10:00:00Z',
+          endTime: '2025-07-30T13:00:00Z',
+          status: 'upcoming',
+          isLive: false,
+          isPaid: true,
+          price: 500,
+          currency: 'INR',
+          hasAccess: false
+        },
+        {
+          id: '2',
+          title: 'NEET Practice Test',
+          examCode: 'NEET001',
+          subject: 'Biology, Physics, Chemistry',
+          duration: 200,
+          totalMarks: 720,
+          startTime: '2025-08-01T09:00:00Z',
+          endTime: '2025-08-01T12:30:00Z',
+          status: 'upcoming',
+          isLive: false,
+          isPaid: false,
+          price: 0,
+          currency: 'INR',
+          hasAccess: true
+        },
+        {
+          id: '3',
+          title: 'CAT Mock Test',
+          examCode: 'CAT001',
+          subject: 'Verbal, DI, Quant',
+          duration: 180,
+          totalMarks: 300,
+          startTime: '2025-08-05T14:00:00Z',
+          endTime: '2025-08-05T17:00:00Z',
+          status: 'upcoming',
+          isLive: false,
+          isPaid: true,
+          price: 750,
+          currency: 'INR',
+          hasAccess: true
+        }
+      ];
+      const mockTests: PracticeTest[] = [
+        {
+          id: '1',
+          title: 'Physics Practice Test',
+          subject: 'Physics',
+          questions: 25,
+          duration: 60,
+          difficulty: 'medium',
+          completed: false
+        }
+      ];
+      setUpcomingExams(mockExams);
+      setPracticeTests(mockTests);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -106,66 +211,6 @@ export default function StudentDashboard() {
   if (!user) {
     return null;
   }
-
-  // Mock data
-  const upcomingExams: Exam[] = [
-    {
-      id: '1',
-      title: 'JEE Main Mock Test 1',
-      examCode: 'JEE001',
-      subject: 'Physics, Chemistry, Mathematics',
-      duration: 180,
-      totalMarks: 300,
-      startTime: '2025-01-15T10:00:00Z',
-      endTime: '2025-01-15T13:00:00Z',
-      status: 'upcoming',
-      isLive: true
-    },
-    {
-      id: '2',
-      title: 'NEET Practice Test',
-      examCode: 'NEET001',
-      subject: 'Biology, Chemistry, Physics',
-      duration: 200,
-      totalMarks: 720,
-      startTime: '2025-01-20T14:00:00Z',
-      endTime: '2025-01-20T17:20:00Z',
-      status: 'upcoming',
-      isLive: false
-    }
-  ];
-
-  const practiceTests: PracticeTest[] = [
-    {
-      id: '1',
-      title: 'Physics - Mechanics',
-      subject: 'Physics',
-      questions: 25,
-      duration: 60,
-      difficulty: 'medium',
-      completed: true,
-      score: 85
-    },
-    {
-      id: '2',
-      title: 'Chemistry - Organic',
-      subject: 'Chemistry',
-      questions: 30,
-      duration: 75,
-      difficulty: 'hard',
-      completed: false
-    },
-    {
-      id: '3',
-      title: 'Mathematics - Calculus',
-      subject: 'Mathematics',
-      questions: 20,
-      duration: 45,
-      difficulty: 'easy',
-      completed: true,
-      score: 92
-    }
-  ];
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -373,23 +418,56 @@ export default function StudentDashboard() {
                         <div key={exam.id} className="border border-gray-200 rounded-lg p-4">
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="font-medium text-gray-900">{exam.title}</h4>
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(exam.status)}`}>
-                              {exam.status}
-                            </span>
+                            <div className="flex items-center space-x-2">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(exam.status)}`}>
+                                {exam.status}
+                              </span>
+                              {exam.isPaid && (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                  Paid
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <p className="text-sm text-gray-600 mb-2">{exam.subject}</p>
-                          <div className="flex justify-between text-xs text-gray-500">
+                          <div className="flex justify-between text-xs text-gray-500 mb-2">
                             <span>Duration: {formatTime(exam.duration)}</span>
                             <span>Marks: {exam.totalMarks}</span>
                           </div>
+                          {exam.isPaid && (
+                            <div className="flex justify-between text-sm mb-2">
+                              <span className="text-gray-500">Price:</span>
+                              <span className="font-medium text-green-600">{exam.price} {exam.currency}</span>
+                            </div>
+                          )}
                           <div className="mt-3">
-                            <Link
-                              href={`/exam/${exam.id}`}
-                              className="inline-flex items-center px-3 py-1 border border-blue-300 rounded-md text-xs font-medium text-blue-700 hover:bg-blue-50"
-                            >
-                              <PlayIcon className="h-3 w-3 mr-1" />
-                              Start Exam
-                            </Link>
+                            {exam.hasAccess ? (
+                              <Link
+                                href={`/exam/${exam.id}`}
+                                className="inline-flex items-center px-3 py-1 border border-blue-300 rounded-md text-xs font-medium text-blue-700 hover:bg-blue-50"
+                              >
+                                <PlayIcon className="h-3 w-3 mr-1" />
+                                Start Exam
+                              </Link>
+                            ) : exam.isPaid ? (
+                              <button
+                                onClick={() => {
+                                  // In a real app, this would open payment modal
+                                  alert('Payment integration would be implemented here');
+                                }}
+                                className="inline-flex items-center px-3 py-1 border border-yellow-300 rounded-md text-xs font-medium text-yellow-700 hover:bg-yellow-50"
+                              >
+                                Pay to Access
+                              </button>
+                            ) : (
+                              <Link
+                                href={`/exam/${exam.id}`}
+                                className="inline-flex items-center px-3 py-1 border border-green-300 rounded-md text-xs font-medium text-green-700 hover:bg-green-50"
+                              >
+                                <PlayIcon className="h-3 w-3 mr-1" />
+                                Free Access
+                              </Link>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -470,9 +548,16 @@ export default function StudentDashboard() {
                     <div key={exam.id} className="border border-gray-200 rounded-lg p-6">
                       <div className="flex justify-between items-start mb-4">
                         <h4 className="font-semibold text-gray-900">{exam.title}</h4>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(exam.status)}`}>
-                          {exam.status}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(exam.status)}`}>
+                            {exam.status}
+                          </span>
+                          {exam.isPaid && (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                              Paid
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="space-y-3 mb-4">
@@ -489,15 +574,46 @@ export default function StudentDashboard() {
                           <span className="text-gray-500">Type:</span>
                           <span className="font-medium">{exam.isLive ? 'Live' : 'Practice'}</span>
                         </div>
+                        {exam.isPaid && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Price:</span>
+                            <span className="font-medium text-green-600">{exam.price} {exam.currency}</span>
+                          </div>
+                        )}
+                        {!exam.hasAccess && exam.isPaid && (
+                          <div className="flex justify-between text-sm text-red-600">
+                            <span>Access Required</span>
+                            <span>Pay Now</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex space-x-2">
-                        <Link
-                          href={`/exam/${exam.id}`}
-                          className="flex-1 bg-blue-600 text-white text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-blue-700"
-                        >
-                          Start Exam
-                        </Link>
+                        {exam.hasAccess ? (
+                          <Link
+                            href={`/exam/${exam.id}`}
+                            className="flex-1 bg-blue-600 text-white text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-blue-700"
+                          >
+                            Start Exam
+                          </Link>
+                        ) : exam.isPaid ? (
+                          <button
+                            onClick={() => {
+                              // In a real app, this would open payment modal
+                              alert('Payment integration would be implemented here');
+                            }}
+                            className="flex-1 bg-yellow-600 text-white text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-yellow-700"
+                          >
+                            Pay to Access
+                          </button>
+                        ) : (
+                          <Link
+                            href={`/exam/${exam.id}`}
+                            className="flex-1 bg-green-600 text-white text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-green-700"
+                          >
+                            Free Access
+                          </Link>
+                        )}
                         <button className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">
                           Details
                         </button>

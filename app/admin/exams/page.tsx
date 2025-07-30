@@ -37,6 +37,9 @@ interface Exam {
   enrolledStudents: number;
   createdAt: string;
   updatedAt: string;
+  isPaid: boolean;
+  price: number;
+  currency: string;
 }
 
 export default function ExamManagement() {
@@ -75,91 +78,45 @@ export default function ExamManagement() {
 
   const loadExams = async () => {
     try {
-      // In a real app, you would fetch this from your API
-      // For now, we'll use mock data
-      const mockExams: Exam[] = [
-        {
-          id: '1',
-          title: 'JEE Main Mock Test 1',
-          examCode: 'JEE001',
-          description: 'Comprehensive mock test for JEE Main preparation',
-          subject: 'Engineering',
-          duration: 180,
-          totalMarks: 300,
-          startTime: '2025-07-30T10:00:00Z',
-          endTime: '2025-07-30T13:00:00Z',
-          status: 'scheduled',
-          isActive: true,
-          maxAttempts: 3,
-          passingScore: 180,
-          totalQuestions: 75,
-          enrolledStudents: 45,
-          createdAt: '2025-07-25T10:00:00.000Z',
-          updatedAt: '2025-07-25T10:00:00.000Z'
-        },
-        {
-          id: '2',
-          title: 'CAT Practice Test',
-          examCode: 'CAT001',
-          description: 'Practice test for Common Admission Test',
-          subject: 'Management',
-          duration: 180,
-          totalMarks: 300,
-          startTime: '2025-08-01T14:00:00Z',
-          endTime: '2025-08-01T17:00:00Z',
-          status: 'draft',
-          isActive: false,
-          maxAttempts: 2,
-          passingScore: 150,
-          totalQuestions: 100,
-          enrolledStudents: 0,
-          createdAt: '2025-07-24T15:30:00.000Z',
-          updatedAt: '2025-07-24T15:30:00.000Z'
-        },
-        {
-          id: '3',
-          title: 'NEET Biology Test',
-          examCode: 'NEET001',
-          description: 'Biology section practice for NEET',
-          subject: 'Medical',
-          duration: 120,
-          totalMarks: 200,
-          startTime: '2025-07-29T09:00:00Z',
-          endTime: '2025-07-29T11:00:00Z',
-          status: 'active',
-          isActive: true,
-          maxAttempts: 1,
-          passingScore: 120,
-          totalQuestions: 50,
-          enrolledStudents: 78,
-          createdAt: '2025-07-23T12:00:00.000Z',
-          updatedAt: '2025-07-23T12:00:00.000Z'
-        },
-        {
-          id: '4',
-          title: 'UPSC Prelims Mock',
-          examCode: 'UPSC001',
-          description: 'Mock test for UPSC Civil Services Prelims',
-          subject: 'Civil Services',
-          duration: 120,
-          totalMarks: 200,
-          startTime: '2025-07-28T10:00:00Z',
-          endTime: '2025-07-28T12:00:00Z',
-          status: 'completed',
-          isActive: false,
-          maxAttempts: 1,
-          passingScore: 100,
-          totalQuestions: 100,
-          enrolledStudents: 120,
-          createdAt: '2025-07-22T08:00:00.000Z',
-          updatedAt: '2025-07-22T08:00:00.000Z'
-        }
-      ];
+      setLoading(true);
+      
+      // Fetch exams from API
+      const response = await fetch('http://localhost:3001/api/exams');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch exams');
+      }
+      
+      const data = await response.json();
+      
+      // Transform API data to match our interface
+      const transformedExams: Exam[] = data.exams.map((exam: any) => ({
+        id: exam._id,
+        title: exam.title,
+        examCode: exam.examCode,
+        description: exam.description,
+        subject: exam.category || 'General',
+        duration: exam.totalDuration,
+        totalMarks: exam.totalMarks,
+        startTime: exam.startTime,
+        endTime: exam.endTime,
+        status: exam.status,
+        isActive: exam.isActive,
+        maxAttempts: exam.maxAttempts,
+        passingScore: exam.passingScore,
+        totalQuestions: exam.totalQuestions || 0,
+        enrolledStudents: exam.analytics?.totalRegistrations || 0,
+        createdAt: exam.createdAt,
+        updatedAt: exam.updatedAt,
+        isPaid: exam.isPaid,
+        price: exam.price,
+        currency: exam.currency
+      }));
 
-      setExams(mockExams);
+      setExams(transformedExams);
+      setLoading(false);
     } catch (error) {
       console.error('Error loading exams:', error);
-    } finally {
       setLoading(false);
     }
   };
@@ -438,6 +395,18 @@ export default function ExamManagement() {
                         <UserGroupIcon className="h-4 w-4 mr-2" />
                         Enrolled: {exam.enrolledStudents} students
                       </div>
+                      {exam.isPaid && (
+                        <div className="flex items-center text-green-600 text-xs">
+                          <CheckCircleIcon className="h-4 w-4 mr-1" />
+                          Paid Exam
+                        </div>
+                      )}
+                      {!exam.isPaid && (
+                        <div className="flex items-center text-red-600 text-xs">
+                          <XCircleIcon className="h-4 w-4 mr-1" />
+                          Free Exam
+                        </div>
+                      )}
                     </div>
                   </div>
                   <input
@@ -468,6 +437,12 @@ export default function ExamManagement() {
                     <p className="text-xs text-gray-500">Max Attempts</p>
                     <p className="text-sm font-medium">{exam.maxAttempts}</p>
                   </div>
+                  {exam.isPaid && (
+                    <div>
+                      <p className="text-xs text-gray-500">Price</p>
+                      <p className="text-sm font-medium">{exam.price} {exam.currency}</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2 mb-4">

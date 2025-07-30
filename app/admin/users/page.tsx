@@ -65,70 +65,35 @@ export default function UserManagement() {
 
   const loadUsers = async () => {
     try {
-      // In a real app, you would fetch this from your API
-      // For now, we'll use mock data
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          email: 'admin@gmail.com',
-          firstName: 'Admin',
-          lastName: 'User',
-          role: 'admin',
-          isActive: true,
-          createdAt: '2025-07-29T13:57:55.669Z',
-          lastLogin: '2025-07-29T14:30:00.000Z'
-        },
-        {
-          id: '2',
-          email: 'john.doe@student.com',
-          firstName: 'John',
-          lastName: 'Doe',
-          role: 'student',
-          studentId: 'STU001',
-          institution: 'MIT',
-          isActive: true,
-          createdAt: '2025-07-28T10:00:00.000Z',
-          lastLogin: '2025-07-29T12:15:00.000Z'
-        },
-        {
-          id: '3',
-          email: 'jane.smith@student.com',
-          firstName: 'Jane',
-          lastName: 'Smith',
-          role: 'student',
-          studentId: 'STU002',
-          institution: 'Stanford',
-          isActive: true,
-          createdAt: '2025-07-27T15:30:00.000Z',
-          lastLogin: '2025-07-29T09:45:00.000Z'
-        },
-        {
-          id: '4',
-          email: 'bob.wilson@student.com',
-          firstName: 'Bob',
-          lastName: 'Wilson',
-          role: 'student',
-          studentId: 'STU003',
-          institution: 'Harvard',
-          isActive: false,
-          createdAt: '2025-07-26T08:20:00.000Z',
-          lastLogin: '2025-07-28T16:30:00.000Z'
-        },
-        {
-          id: '5',
-          email: 'alice.brown@student.com',
-          firstName: 'Alice',
-          lastName: 'Brown',
-          role: 'student',
-          studentId: 'STU004',
-          institution: 'Yale',
-          isActive: true,
-          createdAt: '2025-07-25T11:45:00.000Z',
-          lastLogin: '2025-07-29T13:20:00.000Z'
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      ];
+      });
 
-      setUsers(mockUsers);
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data.users || []);
+      } else {
+        console.error('Failed to fetch users');
+        // Fallback to mock data if API fails
+        const mockUsers: User[] = [
+          {
+            id: '1',
+            email: 'admin@gmail.com',
+            firstName: 'Admin',
+            lastName: 'User',
+            role: 'admin',
+            isActive: true,
+            createdAt: '2025-07-29T13:57:55.669Z',
+            lastLogin: '2025-07-29T14:30:00.000Z'
+          }
+        ];
+        setUsers(mockUsers);
+      }
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {

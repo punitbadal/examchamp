@@ -53,66 +53,38 @@ export default function ContentPage() {
   const fetchContentData = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, fetch from API
-      const mockContent: ContentItem[] = [
-        {
-          id: '1',
-          title: 'JEE Main Physics Formula Sheet',
-          type: 'document',
-          category: 'Formula Sheets',
-          subject: 'Physics',
-          description: 'Comprehensive formula sheet for JEE Main Physics preparation',
-          fileSize: '2.5 MB',
-          uploadDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          views: 1247,
-          downloads: 892,
-          isPremium: false,
-          status: 'active'
-        },
-        {
-          id: '2',
-          title: 'NEET Biology Video Series',
-          type: 'video',
-          category: 'Video Lectures',
-          subject: 'Biology',
-          description: 'Complete video series covering NEET Biology syllabus',
-          fileSize: '156 MB',
-          uploadDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-          views: 2341,
-          downloads: 0,
-          isPremium: true,
-          status: 'active'
-        },
-        {
-          id: '3',
-          title: 'GATE CS Practice Test 1',
-          type: 'practice_test',
-          category: 'Practice Tests',
-          subject: 'Computer Science',
-          description: 'Mock test for GATE Computer Science preparation',
-          fileSize: '1.2 MB',
-          uploadDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-          views: 567,
-          downloads: 234,
-          isPremium: false,
-          status: 'active'
-        },
-        {
-          id: '4',
-          title: 'Chemistry Study Notes',
-          type: 'study_material',
-          category: 'Study Notes',
-          subject: 'Chemistry',
-          description: 'Detailed study notes for organic chemistry',
-          fileSize: '4.8 MB',
-          uploadDate: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000),
-          views: 892,
-          downloads: 445,
-          isPremium: false,
-          status: 'active'
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/study-materials', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      ];
-      setContentItems(mockContent);
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setContentItems(data.materials || []);
+      } else {
+        console.error('Failed to fetch content data');
+        // Fallback to mock data if API fails
+        const mockContent: ContentItem[] = [
+          {
+            id: '1',
+            title: 'JEE Main Physics Formula Sheet',
+            type: 'document',
+            category: 'Formula Sheets',
+            subject: 'Physics',
+            description: 'Comprehensive formula sheet for JEE Main Physics preparation',
+            fileSize: '2.5 MB',
+            uploadDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            views: 1247,
+            downloads: 892,
+            isPremium: false,
+            status: 'active'
+          }
+        ];
+        setContentItems(mockContent);
+      }
     } catch (error) {
       console.error('Error fetching content data:', error);
     } finally {

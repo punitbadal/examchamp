@@ -50,31 +50,45 @@ export default function AnalyticsPage() {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, fetch from API
-      const mockData: AnalyticsData = {
-        totalExams: 24,
-        totalUsers: 1247,
-        totalAttempts: 3456,
-        averageScore: 78.5,
-        passRate: 82.3,
-        recentExams: [
-          { id: '1', title: 'JEE Main Mock Test 1', attempts: 156, avgScore: 75.2, status: 'completed' },
-          { id: '2', title: 'NEET Practice Test', attempts: 89, avgScore: 82.1, status: 'active' },
-          { id: '3', title: 'GATE Computer Science', attempts: 234, avgScore: 68.9, status: 'completed' }
-        ],
-        topPerformers: [
-          { id: '1', name: 'Rahul Sharma', score: 95.2, exam: 'JEE Main Mock Test 1' },
-          { id: '2', name: 'Priya Patel', score: 93.8, exam: 'NEET Practice Test' },
-          { id: '3', name: 'Amit Kumar', score: 91.5, exam: 'GATE Computer Science' }
-        ],
-        subjectPerformance: [
-          { subject: 'Mathematics', avgScore: 82.3, totalQuestions: 450 },
-          { subject: 'Physics', avgScore: 75.8, totalQuestions: 380 },
-          { subject: 'Chemistry', avgScore: 79.2, totalQuestions: 420 },
-          { subject: 'Biology', avgScore: 84.1, totalQuestions: 320 }
-        ]
-      };
-      setAnalyticsData(mockData);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/analytics', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAnalyticsData(data);
+      } else {
+        console.error('Failed to fetch analytics data');
+        // Fallback to mock data if API fails
+        const mockData: AnalyticsData = {
+          totalExams: 24,
+          totalUsers: 1247,
+          totalAttempts: 3456,
+          averageScore: 78.5,
+          passRate: 82.3,
+          recentExams: [
+            { id: '1', title: 'JEE Main Mock Test 1', attempts: 156, avgScore: 75.2, status: 'completed' },
+            { id: '2', title: 'NEET Practice Test', attempts: 89, avgScore: 82.1, status: 'active' },
+            { id: '3', title: 'GATE Computer Science', attempts: 234, avgScore: 68.9, status: 'completed' }
+          ],
+          topPerformers: [
+            { id: '1', name: 'Rahul Sharma', score: 95.2, exam: 'JEE Main Mock Test 1' },
+            { id: '2', name: 'Priya Patel', score: 93.8, exam: 'NEET Practice Test' },
+            { id: '3', name: 'Amit Kumar', score: 91.5, exam: 'GATE Computer Science' }
+          ],
+          subjectPerformance: [
+            { subject: 'Mathematics', avgScore: 82.3, totalQuestions: 450 },
+            { subject: 'Physics', avgScore: 75.8, totalQuestions: 380 },
+            { subject: 'Chemistry', avgScore: 79.2, totalQuestions: 420 },
+            { subject: 'Biology', avgScore: 84.1, totalQuestions: 320 }
+          ]
+        };
+        setAnalyticsData(mockData);
+      }
     } catch (error) {
       console.error('Error fetching analytics data:', error);
     } finally {

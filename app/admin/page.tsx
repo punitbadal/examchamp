@@ -27,6 +27,12 @@ interface User {
 export default function AdminDashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeExams: 0,
+    averageScore: 0,
+    securityAlerts: 0
+  });
 
   useEffect(() => {
     // Check if user is authenticated and is admin
@@ -48,6 +54,7 @@ export default function AdminDashboard() {
       }
       
       setUser(user);
+      fetchDashboardStats();
     } catch (error) {
       console.error('Error parsing user data:', error);
       window.location.href = '/';
@@ -55,6 +62,27 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/analytics/dashboard-stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      } else {
+        console.error('Failed to fetch dashboard stats');
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -130,7 +158,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900">1,247</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-full">
                 <UsersIcon className="h-6 w-6 text-blue-600" />
@@ -147,7 +175,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Exams</p>
-                <p className="text-2xl font-bold text-gray-900">12</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.activeExams}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
                 <DocumentTextIcon className="h-6 w-6 text-green-600" />
@@ -164,7 +192,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Avg Score</p>
-                <p className="text-2xl font-bold text-gray-900">78.5%</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.averageScore}%</p>
               </div>
               <div className="p-3 bg-purple-100 rounded-full">
                 <ChartBarIcon className="h-6 w-6 text-purple-600" />
@@ -181,7 +209,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Security Alerts</p>
-                <p className="text-2xl font-bold text-gray-900">3</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.securityAlerts}</p>
               </div>
               <div className="p-3 bg-red-100 rounded-full">
                 <ShieldCheckIcon className="h-6 w-6 text-red-600" />

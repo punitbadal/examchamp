@@ -1,346 +1,459 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
-const paymentService = require('../services/paymentService');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
-const { asyncHandler, ValidationError } = require('../middleware/errorHandler');
-const logger = require('../utils/logger');
-
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
+const { asyncHandler } = require('../middleware/errorHandler');
+const { authenticateToken } = require('../middleware/auth');
+const Payment = require('../models/Payment');
+const User = require('../models/User');
+const Exam = require('../models/Exam');
+const PracticeTest = require('../models/PracticeTest');
+const StudyMaterial = require('../models/StudyMaterial');
 
-// @route   POST /api/payments/create-order
-// @desc    Create a new payment order
+// @route   GET /api/payments
+// @desc    Get payment history
 // @access  Private
-router.post('/create-order', [
-  authenticateToken,
-  body('examId').isMongoId().withMessage('Valid exam ID is required'),
-  body('amount').isFloat({ min: 1 }).withMessage('Valid amount is required'),
-  body('currency').optional().isIn(['INR', 'USD', 'EUR']).withMessage('Valid currency is required')
-], asyncHandler(async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    throw new ValidationError('Validation failed: ' + errors.array().map(e => e.msg).join(', '));
+router.get('/', authenticateToken, asyncHandler(async (req, res) => {
+  const {
+    status,
+    page = 1,
+    limit = 10,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = req.query;
+
+  const query = {};
+  
+  if (status) query.status = status;
+  
+  // Users can only see their own payments, admins can see all
+  if (req.user.role === 'student') {
+    query.userId = req.user.id;
   }
 
-  const { examId, amount, currency = 'INR' } = req.body;
-  const userId = req.userId;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
 
-  const order = await paymentService.createOrder(userId, examId, amount, currency);
+  const payments = await Payment.find(query)
+    .populate('userId', 'firstName lastName email')
+    .populate('examId', 'title examCode')
+    .populate('practiceTestId', 'title')
+    .populate('studyMaterialId', 'title')
+    .sort(sort)
+    .skip(skip)
+    .limit(parseInt(limit));
 
-  logger.userActivity('Payment order created', {
-    userId,
-    examId,
-    orderId: order.orderId,
-    amount
-  });
+  const total = await Payment.countDocuments(query);
 
-  res.status(201).json({
-    success: true,
-    message: 'Payment order created successfully',
-    data: order
+  res.json({
+    payments,
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      pages: Math.ceil(total / parseInt(limit))
+    }
   });
 }));
 
-// @route   POST /api/payments/verify
-// @desc    Verify payment and grant access
+// @route   POST /api/payments/create-payment
+// @desc    Create a new payment
 // @access  Private
-router.post('/verify', [
+router.post('/create-payment', [
   authenticateToken,
-  body('paymentId').isMongoId().withMessage('Valid payment ID is required'),
-  body('razorpayPaymentId').notEmpty().withMessage('Razorpay payment ID is required'),
-  body('razorpaySignature').notEmpty().withMessage('Razorpay signature is required')
+  body('type').isIn(['exam', 'practice_test', 'study_material', 'subscription']).withMessage('Valid payment type is required'),
+  body('amount').isFloat({ min: 0 }).withMessage('Valid amount is required'),
+  body('currency').optional().isIn(['INR', 'USD', 'EUR']).withMessage('Valid currency is required'),
+  body('examId').optional().isMongoId().withMessage('Valid exam ID is required'),
+  body('practiceTestId').optional().isMongoId().withMessage('Valid practice test ID is required'),
+  body('studyMaterialId').optional().isMongoId().withMessage('Valid study material ID is required'),
+  body('subscriptionType').optional().isIn(['monthly', 'quarterly', 'yearly']).withMessage('Valid subscription type is required')
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    throw new ValidationError('Validation failed: ' + errors.array().map(e => e.msg).join(', '));
+    return res.status(400).json({ errors: errors.array() });
   }
 
-  const { paymentId, razorpayPaymentId, razorpaySignature } = req.body;
+  const {
+    type,
+    amount,
+    currency = 'INR',
+    examId,
+    practiceTestId,
+    studyMaterialId,
+    subscriptionType,
+    paymentMethod = 'online'
+  } = req.body;
 
-  const result = await paymentService.verifyPayment(paymentId, razorpayPaymentId, razorpaySignature);
+  const userId = req.user.id;
 
-  logger.userActivity('Payment verified', {
-    userId: req.userId,
-    paymentId,
-    razorpayPaymentId
+  // Validate based on payment type
+  if (type === 'exam' && !examId) {
+    return res.status(400).json({ message: 'Exam ID is required for exam payments' });
+  }
+  if (type === 'practice_test' && !practiceTestId) {
+    return res.status(400).json({ message: 'Practice test ID is required for practice test payments' });
+  }
+  if (type === 'study_material' && !studyMaterialId) {
+    return res.status(400).json({ message: 'Study material ID is required for study material payments' });
+  }
+  if (type === 'subscription' && !subscriptionType) {
+    return res.status(400).json({ message: 'Subscription type is required for subscription payments' });
+  }
+
+  // Check if user already has access
+  if (type === 'exam') {
+    const existingPayment = await Payment.findOne({
+      userId,
+      examId,
+      status: 'completed'
+    });
+    if (existingPayment) {
+      return res.status(400).json({ message: 'You already have access to this exam' });
+    }
+  }
+
+  if (type === 'practice_test') {
+    const existingPayment = await Payment.findOne({
+      userId,
+      practiceTestId,
+      status: 'completed'
+    });
+    if (existingPayment) {
+      return res.status(400).json({ message: 'You already have access to this practice test' });
+    }
+  }
+
+  if (type === 'study_material') {
+    const existingPayment = await Payment.findOne({
+      userId,
+      studyMaterialId,
+      status: 'completed'
+    });
+    if (existingPayment) {
+      return res.status(400).json({ message: 'You already have access to this study material' });
+    }
+  }
+
+  // Create payment record
+  const payment = new Payment({
+    userId,
+    type,
+    amount,
+    currency,
+    examId,
+    practiceTestId,
+    studyMaterialId,
+    subscriptionType,
+    paymentMethod,
+    status: 'pending',
+    gateway: 'stripe', // Default gateway
+    transactionId: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   });
 
+  await payment.save();
+
+  // In a real implementation, you would integrate with a payment gateway here
+  // For now, we'll simulate a successful payment
+  payment.status = 'completed';
+  payment.completedAt = new Date();
+  await payment.save();
+
+  res.status(201).json({
+    message: 'Payment created successfully',
+    payment
+  });
+}));
+
+// @route   POST /api/payments/verify-payment
+// @desc    Verify payment with payment gateway
+// @access  Private
+router.post('/verify-payment', [
+  authenticateToken,
+  body('paymentId').isMongoId().withMessage('Valid payment ID is required'),
+  body('transactionId').notEmpty().withMessage('Transaction ID is required')
+], asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { paymentId, transactionId } = req.body;
+
+  const payment = await Payment.findById(paymentId);
+  if (!payment) {
+    return res.status(404).json({ message: 'Payment not found' });
+  }
+
+  // Check if user owns this payment
+  if (payment.userId.toString() !== req.user.id) {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  // In a real implementation, verify with payment gateway
+  // For now, we'll simulate verification
+  payment.status = 'completed';
+  payment.completedAt = new Date();
+  payment.gatewayTransactionId = transactionId;
+  await payment.save();
+
   res.json({
-    success: true,
-    message: 'Payment verified and access granted',
-    data: result
+    message: 'Payment verified successfully',
+    payment
+  });
+}));
+
+// @route   GET /api/payments/access-check
+// @desc    Check if user has access to a resource
+// @access  Private
+router.get('/access-check', authenticateToken, asyncHandler(async (req, res) => {
+  const { examId, practiceTestId, studyMaterialId } = req.query;
+
+  const userId = req.user.id;
+  const access = {
+    hasAccess: false,
+    reason: 'No payment found'
+  };
+
+  // Check exam access
+  if (examId) {
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: 'Exam not found' });
+    }
+
+    // Free exams are accessible to all
+    if (!exam.isPaid) {
+      access.hasAccess = true;
+      access.reason = 'Free exam';
+    } else {
+      const payment = await Payment.findOne({
+        userId,
+        examId,
+        status: 'completed'
+      });
+      
+      if (payment) {
+        access.hasAccess = true;
+        access.reason = 'Paid access';
+      }
+    }
+  }
+
+  // Check practice test access
+  if (practiceTestId) {
+    const practiceTest = await PracticeTest.findById(practiceTestId);
+    if (!practiceTest) {
+      return res.status(404).json({ message: 'Practice test not found' });
+    }
+
+    // Free practice tests are accessible to all
+    if (!practiceTest.isPremium) {
+      access.hasAccess = true;
+      access.reason = 'Free practice test';
+    } else {
+      const payment = await Payment.findOne({
+        userId,
+        practiceTestId,
+        status: 'completed'
+      });
+      
+      if (payment) {
+        access.hasAccess = true;
+        access.reason = 'Paid access';
+      }
+    }
+  }
+
+  // Check study material access
+  if (studyMaterialId) {
+    const studyMaterial = await StudyMaterial.findById(studyMaterialId);
+    if (!studyMaterial) {
+      return res.status(404).json({ message: 'Study material not found' });
+    }
+
+    // Free study materials are accessible to all
+    if (!studyMaterial.isPremium) {
+      access.hasAccess = true;
+      access.reason = 'Free study material';
+    } else {
+      const payment = await Payment.findOne({
+        userId,
+        studyMaterialId,
+        status: 'completed'
+      });
+      
+      if (payment) {
+        access.hasAccess = true;
+        access.reason = 'Paid access';
+      }
+    }
+  }
+
+  res.json(access);
+}));
+
+// @route   GET /api/payments/subscription-status
+// @desc    Get user's subscription status
+// @access  Private
+router.get('/subscription-status', authenticateToken, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  const activeSubscription = await Payment.findOne({
+    userId,
+    type: 'subscription',
+    status: 'completed',
+    subscriptionExpiry: { $gt: new Date() }
+  }).sort({ createdAt: -1 });
+
+  if (!activeSubscription) {
+    return res.json({
+      hasSubscription: false,
+      subscription: null
+    });
+  }
+
+  res.json({
+    hasSubscription: true,
+    subscription: {
+      type: activeSubscription.subscriptionType,
+      startDate: activeSubscription.completedAt,
+      expiryDate: activeSubscription.subscriptionExpiry,
+      amount: activeSubscription.amount,
+      currency: activeSubscription.currency
+    }
   });
 }));
 
 // @route   POST /api/payments/refund
-// @desc    Process refund for a payment
-// @access  Private (Admin only)
+// @desc    Request a refund
+// @access  Private
 router.post('/refund', [
   authenticateToken,
-  requireAdmin,
   body('paymentId').isMongoId().withMessage('Valid payment ID is required'),
-  body('amount').isFloat({ min: 0 }).withMessage('Valid refund amount is required'),
   body('reason').notEmpty().withMessage('Refund reason is required')
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    throw new ValidationError('Validation failed: ' + errors.array().map(e => e.msg).join(', '));
+    return res.status(400).json({ errors: errors.array() });
   }
 
-  const { paymentId, amount, reason } = req.body;
+  const { paymentId, reason } = req.body;
 
-  const result = await paymentService.processRefund(paymentId, amount, reason);
-
-  logger.userActivity('Payment refunded by admin', {
-    adminId: req.userId,
-    paymentId,
-    amount,
-    reason
-  });
-
-  res.json({
-    success: true,
-    message: 'Refund processed successfully',
-    data: result
-  });
-}));
-
-// @route   GET /api/payments/access/:examId
-// @desc    Check user access to an exam
-// @access  Private
-router.get('/access/:examId', [
-  authenticateToken,
-  body('examId').isMongoId().withMessage('Valid exam ID is required')
-], asyncHandler(async (req, res) => {
-  const { examId } = req.params;
-  const userId = req.userId;
-
-  const access = await paymentService.checkUserAccess(userId, examId);
-
-  res.json({
-    success: true,
-    data: access
-  });
-}));
-
-// @route   GET /api/payments/history
-// @desc    Get user payment history
-// @access  Private
-router.get('/history', [
-  authenticateToken
-], asyncHandler(async (req, res) => {
-  const userId = req.userId;
-  const { status } = req.query;
-
-  const payments = await paymentService.getUserPayments(userId, status);
-
-  res.json({
-    success: true,
-    data: payments
-  });
-}));
-
-// @route   GET /api/payments/stats
-// @desc    Get payment statistics (Admin only)
-// @access  Private (Admin only)
-router.get('/stats', [
-  authenticateToken,
-  requireAdmin
-], asyncHandler(async (req, res) => {
-  const stats = await paymentService.getPaymentStats();
-
-  res.json({
-    success: true,
-    data: stats
-  });
-}));
-
-// @route   POST /api/payments/webhook
-// @desc    Handle Razorpay webhook events
-// @access  Public
-router.post('/webhook', asyncHandler(async (req, res) => {
-  const signature = req.headers['x-razorpay-signature'];
-  
-  if (!signature) {
-    logger.security('Webhook called without signature', {
-      headers: req.headers,
-      body: req.body
-    });
-    return res.status(400).json({ error: 'Missing signature' });
-  }
-
-  try {
-    await paymentService.handleWebhook(req.body, signature);
-    
-    res.json({ success: true });
-  } catch (error) {
-    logger.error('Webhook processing failed', {
-      error: error.message,
-      body: req.body,
-      signature
-    });
-    
-    res.status(400).json({ error: 'Webhook processing failed' });
-  }
-}));
-
-// @route   GET /api/payments/order/:orderId
-// @desc    Get order details
-// @access  Private
-router.get('/order/:orderId', [
-  authenticateToken
-], asyncHandler(async (req, res) => {
-  const { orderId } = req.params;
-  const userId = req.userId;
-
-  // Find payment by order ID and verify user ownership
-  const Payment = require('../models/Payment');
-  const payment = await Payment.findOne({
-    razorpayOrderId: orderId,
-    userId: userId
-  }).populate('examId', 'title examCode startTime endTime');
-
+  const payment = await Payment.findById(paymentId);
   if (!payment) {
-    return res.status(404).json({
-      success: false,
-      error: 'Order not found'
-    });
+    return res.status(404).json({ message: 'Payment not found' });
   }
 
-  res.json({
-    success: true,
-    data: payment
-  });
-}));
-
-// @route   POST /api/payments/cancel/:paymentId
-// @desc    Cancel a pending payment
-// @access  Private
-router.post('/cancel/:paymentId', [
-  authenticateToken
-], asyncHandler(async (req, res) => {
-  const { paymentId } = req.params;
-  const userId = req.userId;
-
-  const Payment = require('../models/Payment');
-  const payment = await Payment.findOne({
-    _id: paymentId,
-    userId: userId
-  });
-
-  if (!payment) {
-    return res.status(404).json({
-      success: false,
-      error: 'Payment not found'
-    });
+  // Check if user owns this payment
+  if (payment.userId.toString() !== req.user.id) {
+    return res.status(403).json({ message: 'Access denied' });
   }
 
-  if (payment.status !== 'pending') {
-    return res.status(400).json({
-      success: false,
-      error: 'Only pending payments can be cancelled'
-    });
+  // Check if payment is eligible for refund
+  if (payment.status !== 'completed') {
+    return res.status(400).json({ message: 'Payment is not eligible for refund' });
   }
 
-  payment.status = 'cancelled';
+  // Check refund window (e.g., 7 days)
+  const refundWindow = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+  if (Date.now() - payment.completedAt.getTime() > refundWindow) {
+    return res.status(400).json({ message: 'Refund window has expired' });
+  }
+
+  payment.status = 'refunded';
+  payment.refundReason = reason;
+  payment.refundedAt = new Date();
   await payment.save();
 
-  logger.userActivity('Payment cancelled', {
-    userId,
-    paymentId,
-    examId: payment.examId
-  });
-
   res.json({
-    success: true,
-    message: 'Payment cancelled successfully'
+    message: 'Refund request submitted successfully',
+    payment
   });
 }));
 
-// @route   GET /api/payments/exam/:examId/pricing
-// @desc    Get exam pricing information
-// @access  Public
-router.get('/exam/:examId/pricing', asyncHandler(async (req, res) => {
-  const { examId } = req.params;
-
-  const Exam = require('../models/Exam');
-  const exam = await Exam.findById(examId).select('title isPaid price currency description');
-
-  if (!exam) {
-    return res.status(404).json({
-      success: false,
-      error: 'Exam not found'
-    });
+// @route   GET /api/payments/analytics
+// @desc    Get payment analytics (Admin only)
+// @access  Private (Admin)
+router.get('/analytics', authenticateToken, asyncHandler(async (req, res) => {
+  // Check if user is admin
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Access denied' });
   }
 
-  res.json({
-    success: true,
-    data: {
-      examId: exam._id,
-      title: exam.title,
-      isPaid: exam.isPaid,
-      price: exam.price || 0,
-      currency: exam.currency || 'INR',
-      description: exam.description
-    }
+  const { startDate, endDate } = req.query;
+  const query = { status: 'completed' };
+
+  if (startDate && endDate) {
+    query.completedAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate)
+    };
+  }
+
+  const payments = await Payment.find(query);
+  
+  const analytics = {
+    totalRevenue: payments.reduce((sum, p) => sum + p.amount, 0),
+    totalPayments: payments.length,
+    averagePayment: payments.length > 0 ? payments.reduce((sum, p) => sum + p.amount, 0) / payments.length : 0,
+    paymentTypeDistribution: {},
+    monthlyRevenue: {},
+    topProducts: []
+  };
+
+  // Payment type distribution
+  payments.forEach(payment => {
+    analytics.paymentTypeDistribution[payment.type] = 
+      (analytics.paymentTypeDistribution[payment.type] || 0) + 1;
   });
+
+  // Monthly revenue
+  payments.forEach(payment => {
+    const month = payment.completedAt.toISOString().substring(0, 7); // YYYY-MM
+    analytics.monthlyRevenue[month] = (analytics.monthlyRevenue[month] || 0) + payment.amount;
+  });
+
+  res.json(analytics);
 }));
 
-// @route   POST /api/payments/bulk-refund
-// @desc    Process bulk refunds (Admin only)
-// @access  Private (Admin only)
-router.post('/bulk-refund', [
+// @route   PUT /api/payments/:paymentId
+// @desc    Update payment status (Admin only)
+// @access  Private (Admin)
+router.put('/:paymentId', [
   authenticateToken,
-  requireAdmin,
-  body('paymentIds').isArray().withMessage('Payment IDs array is required'),
-  body('reason').notEmpty().withMessage('Refund reason is required')
+  body('status').isIn(['pending', 'completed', 'failed', 'refunded', 'cancelled']).withMessage('Valid status is required')
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    throw new ValidationError('Validation failed: ' + errors.array().map(e => e.msg).join(', '));
+    return res.status(400).json({ errors: errors.array() });
   }
 
-  const { paymentIds, reason } = req.body;
-
-  const results = [];
-  const refundErrors = [];
-
-  for (const paymentId of paymentIds) {
-    try {
-      const Payment = require('../models/Payment');
-      const payment = await Payment.findById(paymentId);
-      
-      if (!payment) {
-        refundErrors.push(`Payment ${paymentId}: Not found`);
-        continue;
-      }
-
-      if (payment.status !== 'completed') {
-        refundErrors.push(`Payment ${paymentId}: Not completed`);
-        continue;
-      }
-
-      const result = await paymentService.processRefund(paymentId, payment.amount, reason);
-      results.push(result);
-    } catch (error) {
-      refundErrors.push(`Payment ${paymentId}: ${error.message}`);
-    }
+  // Check if user is admin
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Access denied' });
   }
 
-  logger.userActivity('Bulk refund processed', {
-    adminId: req.userId,
-    paymentIds,
-    reason,
-    successCount: results.length,
-    errorCount: refundErrors.length
-  });
+  const { paymentId } = req.params;
+  const { status } = req.body;
+
+  const payment = await Payment.findById(paymentId);
+  if (!payment) {
+    return res.status(404).json({ message: 'Payment not found' });
+  }
+
+  payment.status = status;
+  if (status === 'completed' && !payment.completedAt) {
+    payment.completedAt = new Date();
+  }
+  if (status === 'refunded' && !payment.refundedAt) {
+    payment.refundedAt = new Date();
+  }
+
+  await payment.save();
 
   res.json({
-    success: true,
-    message: `Bulk refund processed. ${results.length} successful, ${refundErrors.length} failed.`,
-    data: {
-      successful: results,
-      errors: refundErrors
-    }
+    message: 'Payment status updated successfully',
+    payment
   });
 }));
 

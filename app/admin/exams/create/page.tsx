@@ -67,6 +67,9 @@ interface ExamForm {
   partialCredit: boolean;
   randomizeQuestions: boolean;
   randomizeOptions: boolean;
+  isPaid: boolean;
+  price: number;
+  currency: string;
 }
 
 interface ExamFormErrors {
@@ -104,7 +107,10 @@ export default function CreateExam() {
     negativeMarking: true,
     partialCredit: false,
     randomizeQuestions: false,
-    randomizeOptions: false
+    randomizeOptions: false,
+    isPaid: false,
+    price: 0,
+    currency: 'INR'
   });
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [selectedQuestions, setSelectedQuestions] = useState<Question[]>([]);
@@ -200,6 +206,21 @@ export default function CreateExam() {
       [name]: type === 'checkbox' ? checked : value
     }));
 
+    // Auto-calculate end time when start time or duration changes
+    if (name === 'startTime' || name === 'totalDuration') {
+      const newStartTime = name === 'startTime' ? value : formData.startTime;
+      const newDuration = name === 'totalDuration' ? parseInt(value) : formData.totalDuration;
+      
+      if (newStartTime && newDuration) {
+        const startDate = new Date(newStartTime);
+        const endDate = new Date(startDate.getTime() + newDuration * 60 * 1000);
+        setFormData(prev => ({
+          ...prev,
+          endTime: endDate.toISOString().slice(0, 16)
+        }));
+      }
+    }
+
     // Clear error when user starts typing
     if (errors[name as keyof ExamFormErrors]) {
       setErrors(prev => ({
@@ -207,6 +228,19 @@ export default function CreateExam() {
         [name]: undefined
       }));
     }
+  };
+
+  const handleExamTypeChange = (examType: 'live' | 'practice' | 'mock') => {
+    setFormData(prev => ({
+      ...prev,
+      examType,
+      // Set default values based on exam type
+      maxAttempts: examType === 'live' ? 1 : examType === 'practice' ? 3 : 1,
+      proctoringEnabled: examType === 'live',
+      webcamRequired: examType === 'live',
+      screenRecording: examType === 'live',
+      tabSwitchingDetection: examType === 'live'
+    }));
   };
 
   const handleTemplateChange = (template: string) => {
@@ -345,12 +379,43 @@ export default function CreateExam() {
       newErrors.sections = 'At least one section is required';
     }
 
-    if (!formData.startTime) {
-      newErrors.startTime = 'Start time is required';
-    }
-
-    if (!formData.endTime) {
-      newErrors.endTime = 'End time is required';
+    // Different validation for different exam types
+    if (formData.examType === 'live') {
+      // Live exams require start and end times
+      if (!formData.startTime) {
+        newErrors.startTime = 'Start time is required for live exams';
+      }
+      if (!formData.endTime) {
+        newErrors.endTime = 'End time is required for live exams';
+      }
+      
+      // Validate that end time is after start time
+      if (formData.startTime && formData.endTime) {
+        const startDate = new Date(formData.startTime);
+        const endDate = new Date(formData.endTime);
+        if (endDate <= startDate) {
+          newErrors.endTime = 'End time must be after start time';
+        }
+      }
+    } else {
+      // Practice and mock tests don't require specific start/end times
+      // They can be available anytime
+      if (!formData.startTime) {
+        // Set a default start time (now) for practice/mock tests
+        setFormData(prev => ({
+          ...prev,
+          startTime: new Date().toISOString().slice(0, 16)
+        }));
+      }
+      if (!formData.endTime) {
+        // Set a default end time (1 year from now) for practice/mock tests
+        const defaultEndTime = new Date();
+        defaultEndTime.setFullYear(defaultEndTime.getFullYear() + 1);
+        setFormData(prev => ({
+          ...prev,
+          endTime: defaultEndTime.toISOString().slice(0, 16)
+        }));
+      }
     }
 
     setErrors(newErrors);
@@ -369,14 +434,80 @@ export default function CreateExam() {
     try {
       console.log('Creating exam with payload:', formData);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Prepare the exam data for the API
+      const examData = {
+        title: formData.title,
+        examCode: formData.examCode,
+        description: formData.description,
+        totalMarks: formData.totalMarks,
+        duration: formData.totalDuration,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        examType: formData.examType,
+        maxAttempts: formData.maxAttempts,
+        passingScore: formData.passingScore,
+        isPaid: formData.isPaid,
+        price: formData.isPaid ? formData.price : 0,
+        currency: formData.currency,
+        sections: formData.sections.map(section => ({
+          name: section.name,
+          description: section.instructions,
+          questionCount: section.questions.length,
+          timeLimit: section.duration,
+          marksPerQuestion: section.questions.length > 0 ? section.totalMarks / section.questions.length : 0,
+          subjects: [section.subject],
+          topics: section.questions.map(q => q.topic).filter(Boolean),
+          instructions: section.instructions
+        })),
+        settings: {
+          showTimer: true,
+          showProgress: true,
+          allowReview: true,
+          allowMarkForReview: true,
+          allowBackNavigation: true,
+          autoSubmit: true,
+          showResultsImmediately: true,
+          showLeaderboard: true,
+          showCorrectAnswers: false,
+          showExplanations: false,
+          allowCalculator: false,
+          allowScratchpad: false,
+          allowHighlighter: false
+        },
+        proctoring: {
+          enabled: formData.proctoringEnabled,
+          webcamRequired: formData.webcamRequired,
+          screenSharingRequired: formData.screenRecording,
+          tabSwitchingDetection: formData.tabSwitchingDetection
+        },
+        category: formData.template,
+        difficulty: 'Medium',
+        tags: [formData.template, formData.examType]
+      };
+
+      // Make API call to create exam
+      const response = await fetch('http://localhost:3001/api/exams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(examData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create exam');
+      }
+
+      const result = await response.json();
+      console.log('Exam created successfully:', result);
       
       alert('Exam created successfully!');
       router.push('/admin/exams');
     } catch (error) {
       console.error('Error creating exam:', error);
-      alert('Error creating exam. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Error creating exam: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -557,6 +688,73 @@ export default function CreateExam() {
                       <p className="mt-1 text-sm text-red-600">{errors.description}</p>
                     )}
                   </div>
+
+                  <div className="mt-6">
+                    <h4 className="text-md font-medium text-gray-900 mb-4">Payment Settings</h4>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Paid Exam</div>
+                          <div className="text-sm text-gray-500">Students must pay to access this exam</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="isPaid"
+                          checked={formData.isPaid}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
+
+                      {formData.isPaid && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Price
+                            </label>
+                            <input
+                              type="number"
+                              name="price"
+                              value={formData.price}
+                              onChange={handleInputChange}
+                              min="0"
+                              step="0.01"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="0.00"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Currency
+                            </label>
+                            <select
+                              name="currency"
+                              value={formData.currency}
+                              onChange={handleInputChange}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="INR">INR (₹)</option>
+                              <option value="USD">USD ($)</option>
+                              <option value="EUR">EUR (€)</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      {!formData.isPaid && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <div className="flex items-center">
+                            <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
+                            <div>
+                              <div className="text-sm font-medium text-green-900">Free Exam</div>
+                              <div className="text-sm text-green-700">All students can access this exam without payment</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -596,13 +794,18 @@ export default function CreateExam() {
                       <select
                         name="examType"
                         value={formData.examType}
-                        onChange={handleInputChange}
+                        onChange={(e) => handleExamTypeChange(e.target.value as 'live' | 'practice' | 'mock')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="live">Live Exam</option>
                         <option value="practice">Practice Test</option>
                         <option value="mock">Mock Test</option>
                       </select>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {formData.examType === 'live' && 'Scheduled exam with specific start/end times'}
+                        {formData.examType === 'practice' && 'Self-paced practice test available anytime'}
+                        {formData.examType === 'mock' && 'Simulated exam with realistic conditions'}
+                      </div>
                     </div>
 
                     <div>
@@ -643,48 +846,116 @@ export default function CreateExam() {
                       )}
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Schedule</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Start Time *
-                      </label>
-                      <input
-                        type="datetime-local"
-                        name="startTime"
-                        value={formData.startTime}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
-                          errors.startTime ? 'border-red-300' : 'border-gray-300'
-                        }`}
-                      />
-                      {errors.startTime && (
-                        <p className="mt-1 text-sm text-red-600">{errors.startTime}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        End Time *
-                      </label>
-                      <input
-                        type="datetime-local"
-                        name="endTime"
-                        value={formData.endTime}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
-                          errors.endTime ? 'border-red-300' : 'border-gray-300'
-                        }`}
-                      />
-                      {errors.endTime && (
-                        <p className="mt-1 text-sm text-red-600">{errors.endTime}</p>
-                      )}
+                  {/* Exam Type Features */}
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Exam Type Features</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="space-y-2">
+                        <div className="font-medium text-blue-600">Live Exam</div>
+                        <ul className="text-gray-600 space-y-1">
+                          <li>• Scheduled start/end times</li>
+                          <li>• Proctoring enabled</li>
+                          <li>• Single attempt only</li>
+                          <li>• Real-time monitoring</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="font-medium text-green-600">Practice Test</div>
+                        <ul className="text-gray-600 space-y-1">
+                          <li>• Available anytime</li>
+                          <li>• Multiple attempts (3)</li>
+                          <li>• No proctoring</li>
+                          <li>• Immediate results</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="font-medium text-purple-600">Mock Test</div>
+                        <ul className="text-gray-600 space-y-1">
+                          <li>• Simulated exam conditions</li>
+                          <li>• Single attempt</li>
+                          <li>• Optional proctoring</li>
+                          <li>• Detailed analysis</li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Schedule Section - Only for Live Exams */}
+                {formData.examType === 'live' && (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Schedule (Live Exam)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Start Time *
+                        </label>
+                        <input
+                          type="datetime-local"
+                          name="startTime"
+                          value={formData.startTime}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.startTime ? 'border-red-300' : 'border-gray-300'
+                          }`}
+                        />
+                        {errors.startTime && (
+                          <p className="mt-1 text-sm text-red-600">{errors.startTime}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          End Time (Auto-calculated)
+                        </label>
+                        <input
+                          type="datetime-local"
+                          name="endTime"
+                          value={formData.endTime}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.endTime ? 'border-red-300' : 'border-gray-300'
+                          }`}
+                          readOnly
+                        />
+                        {errors.endTime && (
+                          <p className="mt-1 text-sm text-red-600">{errors.endTime}</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500">
+                          End time is automatically calculated as: Start Time + Duration
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Availability Section - For Practice and Mock Tests */}
+                {formData.examType !== 'live' && (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Availability</h3>
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-blue-800">
+                            {formData.examType === 'practice' ? 'Practice Test' : 'Mock Test'} Availability
+                          </h3>
+                          <div className="mt-2 text-sm text-blue-700">
+                            <p>This {formData.examType === 'practice' ? 'practice test' : 'mock test'} will be available to students anytime between:</p>
+                            <p className="mt-1 font-medium">
+                              {formData.startTime ? new Date(formData.startTime).toLocaleString() : 'Now'} - {formData.endTime ? new Date(formData.endTime).toLocaleString() : '1 year from now'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -891,7 +1162,7 @@ export default function CreateExam() {
             {/* Settings Tab */}
             {activeTab === 'settings' && (
               <div className="space-y-6">
-                <h3 className="text-lg font-medium text-gray-900">Exam Settings</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Exam Settings</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -968,8 +1239,14 @@ export default function CreateExam() {
                           value={formData.maxAttempts}
                           onChange={handleInputChange}
                           min="1"
+                          max={formData.examType === 'practice' ? 10 : 1}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                         />
+                        <p className="mt-1 text-xs text-gray-500">
+                          {formData.examType === 'live' && 'Live exams allow only 1 attempt'}
+                          {formData.examType === 'practice' && 'Practice tests allow multiple attempts (max 10)'}
+                          {formData.examType === 'mock' && 'Mock tests allow only 1 attempt'}
+                        </p>
                       </div>
 
                       <div>
@@ -982,6 +1259,7 @@ export default function CreateExam() {
                           value={formData.passingScore}
                           onChange={handleInputChange}
                           min="0"
+                          max={formData.totalMarks}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
@@ -1003,6 +1281,80 @@ export default function CreateExam() {
                   </div>
                 </div>
 
+                {/* Exam Type Specific Settings */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-md font-medium text-gray-900 mb-4">
+                    {formData.examType === 'live' && 'Live Exam Settings'}
+                    {formData.examType === 'practice' && 'Practice Test Settings'}
+                    {formData.examType === 'mock' && 'Mock Test Settings'}
+                  </h4>
+                  
+                  {formData.examType === 'live' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Proctoring Enabled</div>
+                          <div className="text-sm text-gray-500">Enable AI-based proctoring for live exams</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="proctoringEnabled"
+                          checked={formData.proctoringEnabled}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Webcam Required</div>
+                          <div className="text-sm text-gray-500">Students must enable webcam during exam</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="webcamRequired"
+                          checked={formData.webcamRequired}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.examType === 'practice' && (
+                    <div className="space-y-3">
+                      <div className="text-sm text-gray-600">
+                        <p>• Practice tests are self-paced and available anytime</p>
+                        <p>• Students can take multiple attempts to improve their scores</p>
+                        <p>• Results are shown immediately after completion</p>
+                        <p>• No proctoring is applied for practice tests</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.examType === 'mock' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Enable Proctoring</div>
+                          <div className="text-sm text-gray-500">Optional proctoring for realistic exam conditions</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="proctoringEnabled"
+                          checked={formData.proctoringEnabled}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <p>• Mock tests simulate real exam conditions</p>
+                        <p>• Single attempt to mimic actual exam experience</p>
+                        <p>• Detailed analysis and performance insights</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Exam Instructions
@@ -1022,71 +1374,171 @@ export default function CreateExam() {
             {/* Proctoring Tab */}
             {activeTab === 'proctoring' && (
               <div className="space-y-6">
-                <h3 className="text-lg font-medium text-gray-900">Proctoring Settings</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Proctoring Settings</h3>
                 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">Enable Proctoring</div>
-                    <div className="text-sm text-gray-500">Enable AI-based proctoring for this exam</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    name="proctoringEnabled"
-                    checked={formData.proctoringEnabled}
-                    onChange={handleInputChange}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                </div>
-
-                {formData.proctoringEnabled && (
-                  <div className="space-y-4 pl-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Webcam Required</div>
-                        <div className="text-sm text-gray-500">Students must enable webcam during exam</div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        name="webcamRequired"
-                        checked={formData.webcamRequired}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
+                {formData.examType === 'live' && (
+                  <div className="space-y-6">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-blue-900 mb-2">Live Exam Proctoring</h4>
+                      <p className="text-sm text-blue-800">
+                        Live exams require proctoring to ensure exam integrity. All proctoring features are enabled by default.
+                      </p>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Screen Recording</div>
-                        <div className="text-sm text-gray-500">Record student's screen during exam</div>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Enable Proctoring</div>
+                          <div className="text-sm text-gray-500">Enable AI-based proctoring for this exam</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="proctoringEnabled"
+                          checked={formData.proctoringEnabled}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
                       </div>
-                      <input
-                        type="checkbox"
-                        name="screenRecording"
-                        checked={formData.screenRecording}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                    </div>
 
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Tab Switching Detection</div>
-                        <div className="text-sm text-gray-500">Detect when students switch browser tabs</div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Webcam Required</div>
+                          <div className="text-sm text-gray-500">Students must enable webcam during exam</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="webcamRequired"
+                          checked={formData.webcamRequired}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
                       </div>
-                      <input
-                        type="checkbox"
-                        name="tabSwitchingDetection"
-                        checked={formData.tabSwitchingDetection}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Screen Recording</div>
+                          <div className="text-sm text-gray-500">Record student's screen during exam</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="screenRecording"
+                          checked={formData.screenRecording}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Tab Switching Detection</div>
+                          <div className="text-sm text-gray-500">Detect when students switch browser tabs</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="tabSwitchingDetection"
+                          checked={formData.tabSwitchingDetection}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-blue-900 mb-2">Proctoring Features</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
+                {formData.examType === 'practice' && (
+                  <div className="space-y-6">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-green-900 mb-2">Practice Test - No Proctoring</h4>
+                      <p className="text-sm text-green-800">
+                        Practice tests are designed for learning and improvement. Proctoring is not applied to allow students to focus on learning without pressure.
+                      </p>
+                    </div>
+
+                    <div className="text-sm text-gray-600 space-y-2">
+                      <p>• Practice tests are self-paced learning tools</p>
+                      <p>• No proctoring is applied to reduce stress</p>
+                      <p>• Students can take multiple attempts to improve</p>
+                      <p>• Results are shown immediately for learning purposes</p>
+                    </div>
+                  </div>
+                )}
+
+                {formData.examType === 'mock' && (
+                  <div className="space-y-6">
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-purple-900 mb-2">Mock Test Proctoring</h4>
+                      <p className="text-sm text-purple-800">
+                        Mock tests simulate real exam conditions. Proctoring is optional to provide realistic exam experience.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Enable Proctoring</div>
+                          <div className="text-sm text-gray-500">Optional proctoring for realistic exam conditions</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          name="proctoringEnabled"
+                          checked={formData.proctoringEnabled}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
+
+                      {formData.proctoringEnabled && (
+                        <div className="space-y-4 pl-6">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Webcam Required</div>
+                              <div className="text-sm text-gray-500">Students must enable webcam during exam</div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              name="webcamRequired"
+                              checked={formData.webcamRequired}
+                              onChange={handleInputChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Screen Recording</div>
+                              <div className="text-sm text-gray-500">Record student's screen during exam</div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              name="screenRecording"
+                              checked={formData.screenRecording}
+                              onChange={handleInputChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Tab Switching Detection</div>
+                              <div className="text-sm text-gray-500">Detect when students switch browser tabs</div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              name="tabSwitchingDetection"
+                              checked={formData.tabSwitchingDetection}
+                              onChange={handleInputChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Proctoring Features</h4>
+                  <ul className="text-sm text-gray-800 space-y-1">
                     <li>• AI-powered face detection and monitoring</li>
                     <li>• Multiple face detection (prevents cheating with others)</li>
                     <li>• Screen recording and analysis</li>

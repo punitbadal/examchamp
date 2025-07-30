@@ -9,6 +9,11 @@
             "date": 1753781780644,
             "name": "logs/rejections-2025-07-29.log",
             "hash": "0d8fba91f2c8aa82bd1f5c0a28245620f258cff7a6e4d6846d2408a6303662af"
+        },
+        {
+            "date": 1753878548485,
+            "name": "logs/rejections-2025-07-30.log",
+            "hash": "f06813aadaa7720a3b1a85048203a3375cc699691141ffcc450786d44e19522b"
         }
     ],
     "hashType": "sha256"

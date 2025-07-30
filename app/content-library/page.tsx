@@ -92,7 +92,49 @@ export default function ContentLibrary() {
   const loadContent = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, fetch from API
+      const token = localStorage.getItem('token');
+      
+      // Fetch study materials
+      const materialsResponse = await fetch('/api/study-materials', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (materialsResponse.ok) {
+        const materialsData = await materialsResponse.json();
+        setMaterials(materialsData.materials || []);
+      }
+
+      // Fetch practice tests
+      const testsResponse = await fetch('/api/practice-tests?status=published', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (testsResponse.ok) {
+        const testsData = await testsResponse.json();
+        setPracticeTests(testsData.tests || []);
+      }
+
+      // Fetch subjects
+      const subjectsResponse = await fetch('/api/courses/subjects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (subjectsResponse.ok) {
+        const subjectsData = await subjectsResponse.json();
+        setSubjects(subjectsData.subjects || []);
+      }
+    } catch (error) {
+      console.error('Error loading content:', error);
+      // Fallback to mock data if API fails
       const mockMaterials: StudyMaterial[] = [
         {
           id: '1',
@@ -109,123 +151,37 @@ export default function ContentLibrary() {
           status: 'published',
           rating: 4.5,
           ratingCount: 156
-        },
-        {
-          id: '2',
-          title: 'NEET Biology Video Series',
-          type: 'video',
-          category: 'Video Lectures',
-          subject: 'Biology',
-          description: 'Complete video series covering NEET Biology syllabus',
-          fileSize: '156 MB',
-          uploadDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-          views: 2341,
-          downloads: 0,
-          isPremium: true,
-          status: 'published',
-          rating: 4.8,
-          ratingCount: 89,
-          duration: 180
-        },
-        {
-          id: '3',
-          title: 'Chemistry Study Notes - Organic Chemistry',
-          type: 'notes',
-          category: 'Study Notes',
-          subject: 'Chemistry',
-          description: 'Detailed notes on Organic Chemistry for JEE preparation',
-          fileSize: '1.8 MB',
-          uploadDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-          views: 567,
-          downloads: 234,
-          isPremium: false,
-          status: 'published',
-          rating: 4.2,
-          ratingCount: 45
-        },
-        {
-          id: '4',
-          title: 'Mathematics Previous Year Papers',
-          type: 'previous_papers',
-          category: 'Previous Papers',
-          subject: 'Mathematics',
-          description: 'Collection of previous year JEE Mathematics papers with solutions',
-          fileSize: '5.2 MB',
-          uploadDate: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000),
-          views: 1890,
-          downloads: 1200,
-          isPremium: true,
-          status: 'published',
-          rating: 4.6,
-          ratingCount: 234
         }
       ];
-
-      const mockPracticeTests: PracticeTest[] = [
+      const mockTests: PracticeTest[] = [
         {
           id: '1',
-          title: 'JEE Physics - Mechanics Quiz',
+          title: 'Physics Practice Test',
           type: 'topic_quiz',
           level: 'Intermediate',
           subject: 'Physics',
-          description: 'Practice test covering mechanics topics for JEE preparation',
+          description: 'Practice test for physics concepts',
           questionCount: 25,
           timeLimit: 60,
           passingScore: 60,
           totalMarks: 100,
-          attempts: 156,
-          averageScore: 72.5,
+          attempts: 45,
+          averageScore: 78.5,
           isPremium: false,
-          status: 'published'
-        },
-        {
-          id: '2',
-          title: 'NEET Biology - Human Physiology',
-          type: 'chapter_test',
-          level: 'Advanced',
-          subject: 'Biology',
-          description: 'Comprehensive test on human physiology for NEET',
-          questionCount: 40,
-          timeLimit: 90,
-          passingScore: 70,
-          totalMarks: 160,
-          attempts: 89,
-          averageScore: 68.3,
-          isPremium: true,
-          status: 'published'
-        },
-        {
-          id: '3',
-          title: 'GATE CS - Data Structures',
-          type: 'subject_test',
-          level: 'Expert',
-          subject: 'Computer Science',
-          description: 'Advanced practice test on data structures for GATE',
-          questionCount: 30,
-          timeLimit: 120,
-          passingScore: 65,
-          totalMarks: 120,
-          attempts: 234,
-          averageScore: 75.8,
-          isPremium: true,
           status: 'published'
         }
       ];
-
       const mockSubjects: Subject[] = [
-        { id: '1', name: 'Physics', materialCount: 15, testCount: 8 },
-        { id: '2', name: 'Chemistry', materialCount: 12, testCount: 6 },
-        { id: '3', name: 'Mathematics', materialCount: 18, testCount: 10 },
-        { id: '4', name: 'Biology', materialCount: 9, testCount: 4 },
-        { id: '5', name: 'Computer Science', materialCount: 6, testCount: 3 }
+        {
+          id: '1',
+          name: 'Physics',
+          materialCount: 15,
+          testCount: 8
+        }
       ];
-
       setMaterials(mockMaterials);
-      setPracticeTests(mockPracticeTests);
+      setPracticeTests(mockTests);
       setSubjects(mockSubjects);
-    } catch (error) {
-      console.error('Error loading content:', error);
-      toast.error('Failed to load content');
     } finally {
       setLoading(false);
     }

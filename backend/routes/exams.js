@@ -3,6 +3,7 @@ const multer = require('multer');
 const Papa = require('papaparse');
 const { body, validationResult } = require('express-validator');
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 const ExamAttempt = require('../models/ExamAttempt');
@@ -37,14 +38,17 @@ router.post('/', [
   body('endTime').isISO8601(),
   body('examType').optional().isIn(['practice', 'mock', 'final']),
   body('enrollment').optional().isIn(['open', 'invite_only', 'restricted']),
-  body('difficulty').optional().isIn(['easy', 'medium', 'hard', 'mixed']),
+  body('difficulty').optional().isIn(['Easy', 'Medium', 'Hard']),
   body('maxAttempts').optional().isInt({ min: 1 }),
   body('passingScore').optional().isInt({ min: 0 }),
   body('sections').optional().isArray(),
   body('settings').optional().isObject(),
   body('tags').optional().isArray(),
   body('category').optional().trim(),
-  body('allowedUsers').optional().isArray()
+  body('allowedUsers').optional().isArray(),
+  body('isPaid').optional().isBoolean(),
+  body('price').optional().isFloat({ min: 0 }),
+  body('currency').optional().isIn(['INR', 'USD', 'EUR'])
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -68,7 +72,10 @@ router.post('/', [
     settings = {},
     tags = [],
     category,
-    allowedUsers = []
+    allowedUsers = [],
+    isPaid = false,
+    price = 0,
+    currency = 'INR'
   } = req.body;
 
   // Validate time constraints
@@ -84,13 +91,19 @@ router.post('/', [
     return res.status(400).json({ error: 'End time must be after start time' });
   }
 
+  // Validate payment settings
+  if (isPaid && price <= 0) {
+    return res.status(400).json({ error: 'Paid exams must have a price greater than 0' });
+  }
+
   // Create exam
   const exam = new Exam({
     title,
     description,
     instructions,
+    examCode: req.body.examCode,
     totalMarks,
-    duration,
+    totalDuration: duration, // Map duration to totalDuration
     startTime: start,
     endTime: end,
     examType,
@@ -98,12 +111,15 @@ router.post('/', [
     difficulty,
     maxAttempts,
     passingScore,
+    isPaid,
+    price: isPaid ? price : 0,
+    currency,
     sections,
     settings,
     tags,
     category,
     allowedUsers,
-    createdBy: req.user?.id || 'admin' // This would come from auth middleware
+    createdBy: new mongoose.Types.ObjectId() // Generate a new ObjectId for now
   });
 
   await exam.save();

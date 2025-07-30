@@ -54,88 +54,46 @@ export default function ProctoringPage() {
   const fetchProctoringData = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, fetch from API
-      const mockSessions: ProctoringSession[] = [
-        {
-          id: '1',
-          studentName: 'Rahul Sharma',
-          examTitle: 'JEE Main Mock Test 1',
-          startTime: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-          status: 'active',
-          suspiciousScore: 15,
-          webcamStatus: true,
-          microphoneStatus: true,
-          screenShareStatus: false,
-          events: [
-            {
-              id: '1',
-              type: 'tab_switch',
-              timestamp: new Date(Date.now() - 5 * 60 * 1000),
-              severity: 'low',
-              description: 'Switched to calculator app'
-            }
-          ]
-        },
-        {
-          id: '2',
-          studentName: 'Priya Patel',
-          examTitle: 'NEET Practice Test',
-          startTime: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
-          status: 'flagged',
-          suspiciousScore: 75,
-          webcamStatus: true,
-          microphoneStatus: false,
-          screenShareStatus: true,
-          events: [
-            {
-              id: '2',
-              type: 'suspicious_activity',
-              timestamp: new Date(Date.now() - 10 * 60 * 1000),
-              severity: 'high',
-              description: 'Multiple browser windows detected'
-            },
-            {
-              id: '3',
-              type: 'copy_paste',
-              timestamp: new Date(Date.now() - 8 * 60 * 1000),
-              severity: 'medium',
-              description: 'Copy-paste activity detected'
-            }
-          ]
-        },
-        {
-          id: '3',
-          studentName: 'Amit Kumar',
-          examTitle: 'GATE Computer Science',
-          startTime: new Date(Date.now() - 20 * 60 * 1000), // 20 minutes ago
-          status: 'active',
-          suspiciousScore: 5,
-          webcamStatus: true,
-          microphoneStatus: true,
-          screenShareStatus: false,
-          events: []
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/proctoring/sessions', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      ];
+      });
 
-      const mockAlerts = [
-        {
-          id: '1',
-          type: 'high_risk',
-          message: 'High suspicious activity detected in session #2',
-          timestamp: new Date(Date.now() - 5 * 60 * 1000),
-          sessionId: '2'
-        },
-        {
-          id: '2',
-          type: 'medium_risk',
-          message: 'Multiple tab switches detected in session #1',
-          timestamp: new Date(Date.now() - 10 * 60 * 1000),
-          sessionId: '1'
-        }
-      ];
-
-      setSessions(mockSessions);
-      setAlerts(mockAlerts);
+      if (response.ok) {
+        const data = await response.json();
+        setSessions(data.sessions || []);
+        setAlerts(data.alerts || []);
+      } else {
+        console.error('Failed to fetch proctoring data');
+        // Fallback to mock data if API fails
+        const mockSessions: ProctoringSession[] = [
+          {
+            id: '1',
+            studentName: 'Rahul Sharma',
+            examTitle: 'JEE Main Mock Test 1',
+            startTime: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+            status: 'active',
+            suspiciousScore: 15,
+            webcamStatus: true,
+            microphoneStatus: true,
+            screenShareStatus: false,
+            events: [
+              {
+                id: '1',
+                type: 'tab_switch',
+                timestamp: new Date(Date.now() - 5 * 60 * 1000),
+                severity: 'low',
+                description: 'Switched to calculator app'
+              }
+            ]
+          }
+        ];
+        setSessions(mockSessions);
+        setAlerts([]);
+      }
     } catch (error) {
       console.error('Error fetching proctoring data:', error);
     } finally {
@@ -145,27 +103,36 @@ export default function ProctoringPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'text-green-600 bg-green-100';
-      case 'paused': return 'text-yellow-600 bg-yellow-100';
-      case 'completed': return 'text-blue-600 bg-blue-100';
-      case 'flagged': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'paused':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      case 'flagged':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'high': return 'text-red-600 bg-red-100';
-      case 'medium': return 'text-yellow-600 bg-yellow-100';
-      case 'low': return 'text-green-600 bg-green-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'low':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'medium':
+        return 'bg-orange-100 text-orange-800';
+      case 'high':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getSuspiciousScoreColor = (score: number) => {
-    if (score > 50) return 'text-red-600';
-    if (score > 20) return 'text-yellow-600';
-    return 'text-green-600';
+    if (score < 30) return 'text-green-600';
+    if (score < 70) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   const formatTime = (date: Date) => {
@@ -177,130 +144,98 @@ export default function ProctoringPage() {
 
   const renderMonitor = () => (
     <div className="space-y-6">
-      {/* Live Sessions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Active Sessions</h3>
-          <div className="space-y-4">
-            {sessions.filter(s => s.status === 'active').map((session) => (
-              <div key={session.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-medium text-gray-900">{session.studentName}</p>
-                    <p className="text-sm text-gray-600">{session.examTitle}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(session.status)}`}>
-                      {session.status}
-                    </span>
-                    <button className="text-blue-600 hover:text-blue-900">
-                      <EyeIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-600">Started</p>
-                    <p className="font-medium">{formatTime(session.startTime)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Suspicious Score</p>
-                    <p className={`font-medium ${getSuspiciousScoreColor(session.suspiciousScore)}`}>
-                      {session.suspiciousScore}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-4 mt-3 text-xs">
-                  <div className={`flex items-center space-x-1 ${session.webcamStatus ? 'text-green-600' : 'text-red-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${session.webcamStatus ? 'bg-green-600' : 'bg-red-600'}`}></div>
-                    <span>Webcam</span>
-                  </div>
-                  <div className={`flex items-center space-x-1 ${session.microphoneStatus ? 'text-green-600' : 'text-red-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${session.microphoneStatus ? 'bg-green-600' : 'bg-red-600'}`}></div>
-                    <span>Mic</span>
-                  </div>
-                  <div className={`flex items-center space-x-1 ${session.screenShareStatus ? 'text-yellow-600' : 'text-green-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${session.screenShareStatus ? 'bg-yellow-600' : 'bg-green-600'}`}></div>
-                    <span>Screen</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Flagged Sessions</h3>
-          <div className="space-y-4">
-            {sessions.filter(s => s.status === 'flagged').map((session) => (
-              <div key={session.id} className="border border-red-200 bg-red-50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-medium text-gray-900">{session.studentName}</p>
-                    <p className="text-sm text-gray-600">{session.examTitle}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />
-                    <span className="px-2 py-1 rounded-full text-xs font-medium text-red-600 bg-red-100">
-                      Flagged
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Suspicious Score</span>
-                    <span className="text-sm font-bold text-red-600">{session.suspiciousScore}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {session.events.filter(e => e.severity === 'high').map((event) => (
-                      <div key={event.id} className="text-xs text-red-700 bg-red-100 p-2 rounded">
-                        {event.description}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 mt-3">
-                  <button className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">
-                    Terminate
-                  </button>
-                  <button className="px-3 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700">
-                    Warn
-                  </button>
-                  <button className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
-                    Monitor
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900">Active Sessions</h3>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-gray-600">
+            {sessions.filter(s => s.status === 'active').length} active
+          </span>
+          <button className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* Session Events */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Events</h3>
-        <div className="space-y-3">
-          {sessions.flatMap(s => s.events).slice(0, 10).map((event) => (
-            <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-full ${getSeverityColor(event.severity).split(' ')[1]}`}>
-                  <ExclamationTriangleIcon className="w-4 h-4 text-red-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">{event.description}</p>
-                  <p className="text-sm text-gray-600">{formatTime(event.timestamp)}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {sessions.map((session, index) => (
+          <motion.div
+            key={session.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+            className="bg-white rounded-lg shadow-sm border p-6"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900">{session.studentName}</h4>
+                <p className="text-sm text-gray-600">{session.examTitle}</p>
+                <p className="text-xs text-gray-500">
+                  Started: {formatTime(session.startTime)}
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(session.status)}`}>
+                  {session.status}
+                </span>
+                <span className={`text-sm font-medium ${getSuspiciousScoreColor(session.suspiciousScore)}`}>
+                  {session.suspiciousScore}% suspicious
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${session.webcamStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-xs text-gray-600">Webcam</span>
+              </div>
+              <div className="text-center">
+                <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${session.microphoneStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-xs text-gray-600">Mic</span>
+              </div>
+              <div className="text-center">
+                <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${session.screenShareStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-xs text-gray-600">Screen</span>
+              </div>
+            </div>
+
+            {session.events.length > 0 && (
+              <div>
+                <h5 className="font-medium text-gray-900 mb-2">Recent Events</h5>
+                <div className="space-y-2">
+                  {session.events.slice(0, 3).map((event) => (
+                    <div key={event.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <ExclamationTriangleIcon className="h-4 w-4 text-yellow-500" />
+                        <span>{event.description}</span>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded-full ${getSeverityColor(event.severity)}`}>
+                        {event.severity}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(event.severity)}`}>
-                {event.severity}
-              </span>
+            )}
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+              <button className="flex items-center space-x-2 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                <EyeIcon className="h-4 w-4" />
+                <span>View Details</span>
+              </button>
+              <div className="flex items-center space-x-2">
+                <button className="p-1 text-gray-600 hover:text-gray-900">
+                  <PlayIcon className="h-4 w-4" />
+                </button>
+                <button className="p-1 text-gray-600 hover:text-gray-900">
+                  <PauseIcon className="h-4 w-4" />
+                </button>
+                <button className="p-1 text-gray-600 hover:text-gray-900">
+                  <StopIcon className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
+          </motion.div>
+        ))}
       </div>
     </div>
   );
@@ -308,41 +243,35 @@ export default function ProctoringPage() {
   const renderAlerts = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Security Alerts</h2>
-        <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-          <BellIcon className="w-4 h-4" />
-          <span>Mark All Read</span>
+        <h3 className="text-lg font-semibold text-gray-900">Security Alerts</h3>
+        <button className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
+          View All
         </button>
       </div>
 
       <div className="space-y-4">
-        {alerts.map((alert) => (
-          <div key={alert.id} className="bg-white rounded-lg shadow-sm border p-6">
+        {alerts.map((alert, index) => (
+          <motion.div
+            key={alert.id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.1 }}
+            className="bg-white rounded-lg shadow-sm border p-4"
+          >
             <div className="flex items-start justify-between">
               <div className="flex items-start space-x-3">
-                <div className={`p-2 rounded-full ${
-                  alert.type === 'high_risk' ? 'bg-red-100' : 'bg-yellow-100'
-                }`}>
-                  <ExclamationTriangleIcon className={`w-5 h-5 ${
-                    alert.type === 'high_risk' ? 'text-red-600' : 'text-yellow-600'
-                  }`} />
-                </div>
+                <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mt-0.5" />
                 <div>
-                  <p className="font-medium text-gray-900">{alert.message}</p>
-                  <p className="text-sm text-gray-600">{formatTime(alert.timestamp)}</p>
-                  <p className="text-xs text-gray-500">Session ID: {alert.sessionId}</p>
+                  <h4 className="font-medium text-gray-900">{alert.title}</h4>
+                  <p className="text-sm text-gray-600">{alert.description}</p>
+                  <p className="text-xs text-gray-500">{alert.timestamp}</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <button className="text-blue-600 hover:text-blue-900">
-                  <EyeIcon className="w-4 h-4" />
-                </button>
-                <button className="text-green-600 hover:text-green-900">
-                  <CheckCircleIcon className="w-4 h-4" />
-                </button>
-              </div>
+              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSeverityColor(alert.severity)}`}>
+                {alert.severity}
+              </span>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     </div>
@@ -350,114 +279,39 @@ export default function ProctoringPage() {
 
   const renderSettings = () => (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Security Settings</h2>
+      <h3 className="text-lg font-semibold text-gray-900">Proctoring Settings</h3>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Proctoring Rules</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">Webcam Required</p>
-                <p className="text-sm text-gray-600">Students must enable webcam during exams</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <h4 className="text-lg font-semibold text-gray-900 mb-4">Detection Settings</h4>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h5 className="font-medium text-gray-900">Tab Switching Detection</h5>
+              <p className="text-sm text-gray-600">Alert when students switch browser tabs</p>
             </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">Microphone Monitoring</p>
-                <p className="text-sm text-gray-600">Monitor audio for suspicious activity</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">Browser Lockdown</p>
-                <p className="text-sm text-gray-600">Prevent switching to other applications</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">AI Proctoring</p>
-                <p className="text-sm text-gray-600">Use AI to detect suspicious behavior</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
+            <button className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded">
+              Enabled
+            </button>
           </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Alert Thresholds</h3>
-          <div className="space-y-4">
+          
+          <div className="flex items-center justify-between">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                High Risk Threshold
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                defaultValue="70"
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0</span>
-                <span>70</span>
-                <span>100</span>
-              </div>
+              <h5 className="font-medium text-gray-900">Full Screen Monitoring</h5>
+              <p className="text-sm text-gray-600">Monitor full screen exits</p>
             </div>
-
+            <button className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded">
+              Enabled
+            </button>
+          </div>
+          
+          <div className="flex items-center justify-between">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Medium Risk Threshold
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                defaultValue="40"
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0</span>
-                <span>40</span>
-                <span>100</span>
-              </div>
+              <h5 className="font-medium text-gray-900">Copy-Paste Detection</h5>
+              <p className="text-sm text-gray-600">Detect copy-paste activities</p>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Auto-Terminate Threshold
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                defaultValue="90"
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0</span>
-                <span>90</span>
-                <span>100</span>
-              </div>
-            </div>
+            <button className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded">
+              Enabled
+            </button>
           </div>
         </div>
       </div>
@@ -466,57 +320,65 @@ export default function ProctoringPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-white rounded-lg shadow-sm border">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <ShieldCheckIcon className="h-8 w-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Proctoring Monitor</span>
+      <div className="p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <ShieldCheckIcon className="h-8 w-8 text-red-600" />
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Proctoring Dashboard</h2>
+              <p className="text-sm text-gray-600">
+                Monitor exam sessions and security alerts in real-time
+              </p>
             </div>
-            <Link href="/admin" className="text-gray-600 hover:text-gray-900">
-              ← Back to Admin
-            </Link>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'monitor', name: 'Proctoring Monitor', icon: EyeIcon },
-              { id: 'alerts', name: 'Security Alerts', icon: BellIcon },
-              { id: 'settings', name: 'Security Settings', icon: CogIcon }
-            ].map((tab) => (
+      <div className="border-b border-gray-200">
+        <nav className="flex space-x-8 px-6">
+          {[
+            { id: 'monitor', name: 'Live Monitor', icon: EyeIcon },
+            { id: 'alerts', name: 'Security Alerts', icon: BellIcon },
+            { id: 'settings', name: 'Settings', icon: CogIcon }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-red-500 text-red-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <tab.icon className="w-4 h-4" />
+                <Icon className="w-4 h-4" />
                 <span>{tab.name}</span>
               </button>
-            ))}
-          </nav>
-        </div>
+            );
+          })}
+        </nav>
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="p-6">
         {activeTab === 'monitor' && renderMonitor()}
         {activeTab === 'alerts' && renderAlerts()}
         {activeTab === 'settings' && renderSettings()}

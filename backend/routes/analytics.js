@@ -9,6 +9,54 @@ const User = require('../models/User');
 const AnalyticsService = require('../services/analyticsService');
 const { authenticateToken } = require('../middleware/auth');
 
+// Settings management
+router.get('/settings', authenticateToken, asyncHandler(async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // For now, return default settings
+    // In a real app, these would be stored in a database
+    const settings = {
+      siteName: 'ExamTech',
+      siteDescription: 'Advanced examination platform for educational institutions',
+      contactEmail: 'admin@examtech.com',
+      maxFileSize: 10,
+      allowedFileTypes: ['pdf', 'doc', 'docx', 'jpg', 'png', 'mp4'],
+      maintenanceMode: false,
+      registrationEnabled: true,
+      emailNotifications: true,
+      smsNotifications: false,
+      backupFrequency: 'daily',
+      lastBackup: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      securityLevel: 'medium'
+    };
+
+    res.json({ settings });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching settings', error: error.message });
+  }
+}));
+
+router.put('/settings', authenticateToken, asyncHandler(async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { settings } = req.body;
+    
+    // In a real app, save settings to database
+    // For now, just return success
+    res.json({ message: 'Settings updated successfully', settings });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating settings', error: error.message });
+  }
+}));
+
 // Get overview analytics
 router.get('/overview', authenticateToken, asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -21,6 +69,40 @@ router.get('/overview', authenticateToken, asyncHandler(async (req, res) => {
     res.json(stats);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching overview analytics', error: error.message });
+  }
+}));
+
+// Get dashboard stats for admin
+router.get('/dashboard-stats', authenticateToken, asyncHandler(async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const totalUsers = await User.countDocuments();
+    const activeExams = await Exam.countDocuments({ status: 'active' });
+    const totalAttempts = await ExamAttempt.countDocuments();
+    
+    // Calculate average score
+    const attempts = await ExamAttempt.find({ status: 'completed' });
+    const averageScore = attempts.length > 0 
+      ? attempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / attempts.length 
+      : 0;
+
+    // Count security alerts (proctoring violations)
+    const securityAlerts = await ExamAttempt.countDocuments({ 
+      'proctoring.violations': { $exists: true, $ne: [] } 
+    });
+
+    res.json({
+      totalUsers,
+      activeExams,
+      averageScore: Math.round(averageScore * 100) / 100,
+      securityAlerts
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching dashboard stats', error: error.message });
   }
 }));
 

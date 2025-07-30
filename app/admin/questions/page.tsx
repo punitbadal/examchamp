@@ -77,93 +77,50 @@ export default function QuestionManagement() {
 
   const loadQuestions = async () => {
     try {
-      // Mock data for demonstration
-      const mockQuestions: Question[] = [
-        {
-          id: '1',
-          questionText: 'A particle moves along a straight line with velocity v = 3t² - 6t + 2 m/s. The acceleration of the particle at t = 2s is:',
-          questionType: 'mcq',
-          subject: 'Physics',
-          chapter: 'Kinematics',
-          topic: 'Motion in One Dimension',
-          difficulty: 'medium',
-          marks: 4,
-          negativeMarks: 1,
-          options: [
-            '6 m/s²',
-            '8 m/s²',
-            '10 m/s²',
-            '12 m/s²'
-          ],
-          correctAnswer: '6 m/s²',
-          explanation: 'Acceleration is the derivative of velocity. a = dv/dt = 6t - 6. At t = 2s, a = 6(2) - 6 = 6 m/s²',
-          tags: ['kinematics', 'derivatives', 'motion'],
-          isActive: true,
-          createdBy: 'admin@gmail.com',
-          createdAt: '2025-07-25T10:00:00.000Z',
-          updatedAt: '2025-07-25T10:00:00.000Z',
-          usageCount: 15
-        },
-        {
-          id: '2',
-          questionText: 'The value of ∫(x² + 2x + 1)dx from 0 to 2 is:',
-          questionType: 'numerical',
-          subject: 'Mathematics',
-          chapter: 'Calculus',
-          topic: 'Integration',
-          difficulty: 'easy',
-          marks: 3,
-          negativeMarks: 0,
-          correctAnswer: '8',
-          explanation: '∫(x² + 2x + 1)dx = (x³/3 + x² + x) from 0 to 2 = (8/3 + 4 + 2) - 0 = 8',
-          tags: ['calculus', 'integration', 'definite-integral'],
-          isActive: true,
-          createdBy: 'admin@gmail.com',
-          createdAt: '2025-07-24T15:30:00.000Z',
-          updatedAt: '2025-07-24T15:30:00.000Z',
-          usageCount: 8
-        },
-        {
-          id: '3',
-          questionText: 'Match the following:\nColumn I: A) HCl B) H₂SO₄ C) HNO₃\nColumn II: 1) Monobasic 2) Dibasic 3) Tribasic',
-          questionType: 'matrix_match',
-          subject: 'Chemistry',
-          chapter: 'Acids and Bases',
-          topic: 'Types of Acids',
-          difficulty: 'medium',
-          marks: 4,
-          negativeMarks: 1,
-          correctAnswer: ['A-1', 'B-2', 'C-1'],
-          explanation: 'HCl is monobasic (1 H⁺), H₂SO₄ is dibasic (2 H⁺), HNO₃ is monobasic (1 H⁺)',
-          tags: ['acids', 'basicity', 'inorganic-chemistry'],
-          isActive: true,
-          createdBy: 'admin@gmail.com',
-          createdAt: '2025-07-23T12:00:00.000Z',
-          updatedAt: '2025-07-23T12:00:00.000Z',
-          usageCount: 12
-        },
-        {
-          id: '4',
-          questionText: 'Assertion: All living cells contain DNA.\nReason: DNA is the genetic material that carries hereditary information.',
-          questionType: 'assertion_reason',
-          subject: 'Biology',
-          chapter: 'Cell Biology',
-          topic: 'Genetic Material',
-          difficulty: 'easy',
-          marks: 3,
-          negativeMarks: 1,
-          correctAnswer: 'Both A and R are true and R is the correct explanation of A',
-          explanation: 'Both assertion and reason are true, and the reason correctly explains why all living cells contain DNA.',
-          tags: ['cell-biology', 'dna', 'genetics'],
-          isActive: true,
-          createdBy: 'admin@gmail.com',
-          createdAt: '2025-07-22T08:00:00.000Z',
-          updatedAt: '2025-07-22T08:00:00.000Z',
-          usageCount: 20
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/questions', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      ];
+      });
 
-      setQuestions(mockQuestions);
+      if (response.ok) {
+        const data = await response.json();
+        setQuestions(data.questions || []);
+      } else {
+        console.error('Failed to fetch questions');
+        // Fallback to mock data if API fails
+        const mockQuestions: Question[] = [
+          {
+            id: '1',
+            questionText: 'A particle moves along a straight line with velocity v = 3t² - 6t + 2 m/s. The acceleration of the particle at t = 2s is:',
+            questionType: 'mcq',
+            subject: 'Physics',
+            chapter: 'Kinematics',
+            topic: 'Motion in One Dimension',
+            difficulty: 'medium',
+            marks: 4,
+            negativeMarks: 1,
+            options: [
+              '6 m/s²',
+              '8 m/s²',
+              '10 m/s²',
+              '12 m/s²'
+            ],
+            correctAnswer: '6 m/s²',
+            explanation: 'Acceleration is the derivative of velocity. a = dv/dt = 6t - 6. At t = 2s, a = 6(2) - 6 = 6 m/s²',
+            tags: ['kinematics', 'derivatives', 'motion'],
+            isActive: true,
+            createdBy: 'admin@gmail.com',
+            createdAt: '2025-07-25T10:00:00.000Z',
+            updatedAt: '2025-07-25T10:00:00.000Z',
+            usageCount: 15
+          }
+        ];
+        setQuestions(mockQuestions);
+      }
     } catch (error) {
       console.error('Error loading questions:', error);
     } finally {

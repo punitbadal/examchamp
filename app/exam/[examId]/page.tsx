@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import PaymentModal from '../../components/PaymentModal';
 
 interface Question {
   id: string;
@@ -84,7 +85,10 @@ export default function LiveExam() {
   const [examSubmitted, setExamSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [hasAccess, setHasAccess] = useState(false);
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
   // Proctoring state
   const [proctoringEnabled, setProctoringEnabled] = useState(true);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
@@ -114,6 +118,7 @@ export default function LiveExam() {
     }
 
     loadExam();
+    checkAccess();
     setupProctoring();
     
     return () => {
@@ -124,82 +129,93 @@ export default function LiveExam() {
 
   const loadExam = async () => {
     try {
-      // Mock exam data
-      const mockExam: Exam = {
-        id: examId,
-        title: 'JEE Main Mock Test 1',
-        examCode: 'JEE001',
-        totalDuration: 180,
-        totalMarks: 300,
-        instructions: 'Read each question carefully. You have 3 hours to complete this exam. Negative marking applies.',
-        negativeMarking: true,
-        partialCredit: false,
-        randomizeQuestions: false,
-        randomizeOptions: false,
-        sections: [
-          {
-            id: '1',
-            name: 'Physics',
-            duration: 60,
-            totalMarks: 100,
-            instructions: 'Physics section with 25 questions',
-            questions: [
-              {
-                id: '1',
-                questionText: 'A particle moves along a straight line with velocity v = 3t² - 6t + 2 m/s. The acceleration of the particle at t = 2s is:',
-                questionType: 'mcq',
-                options: ['6 m/s²', '8 m/s²', '10 m/s²', '12 m/s²'],
-                correctAnswer: '6 m/s²',
-                marks: 4,
-                negativeMarks: 1
-              },
-              {
-                id: '2',
-                questionText: 'The value of ∫(x² + 2x + 1)dx from 0 to 2 is:',
-                questionType: 'numerical',
-                correctAnswer: '8',
-                marks: 3,
-                negativeMarks: 0
-              },
-              {
-                id: '3',
-                questionText: 'Match the following:\nColumn I: A) HCl B) H₂SO₄ C) HNO₃\nColumn II: 1) Monobasic 2) Dibasic 3) Tribasic',
-                questionType: 'matrix_match',
-                correctAnswer: ['A-1', 'B-2', 'C-1'],
-                marks: 4,
-                negativeMarks: 1
-              }
-            ]
-          },
-          {
-            id: '2',
-            name: 'Chemistry',
-            duration: 60,
-            totalMarks: 100,
-            instructions: 'Chemistry section with 25 questions',
-            questions: [
-              {
-                id: '4',
-                questionText: 'What is the molecular formula of glucose?',
-                questionType: 'mcq',
-                options: ['C₆H₁₂O₆', 'C₆H₁₀O₅', 'C₅H₁₀O₅', 'C₆H₁₂O₅'],
-                correctAnswer: 'C₆H₁₂O₆',
-                marks: 4,
-                negativeMarks: 1
-              }
-            ]
-          }
-        ]
-      };
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/exams/${examId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      setExam(mockExam);
-      setTimeRemaining(mockExam.totalDuration * 60); // Convert to seconds
-      setLoading(false);
+      if (response.ok) {
+        const examData = await response.json();
+        setExam(examData.exam);
+        setTimeRemaining(examData.exam.totalDuration * 60); // Convert to seconds
+      } else {
+        console.error('Failed to load exam');
+        // Fallback to mock data if API fails
+        const mockExam: Exam = {
+          id: examId,
+          title: 'JEE Main Mock Test 1',
+          examCode: 'JEE001',
+          totalDuration: 180,
+          totalMarks: 300,
+          instructions: 'Read each question carefully. You have 3 hours to complete this exam. Negative marking applies.',
+          negativeMarking: true,
+          partialCredit: false,
+          randomizeQuestions: false,
+          randomizeOptions: false,
+          sections: [
+            {
+              id: '1',
+              name: 'Physics',
+              duration: 60,
+              totalMarks: 100,
+              instructions: 'Physics section with 25 questions',
+              questions: [
+                {
+                  id: '1',
+                  questionText: 'A particle moves along a straight line with velocity v = 3t² - 6t + 2 m/s. The acceleration of the particle at t = 2s is:',
+                  questionType: 'mcq',
+                  options: ['6 m/s²', '8 m/s²', '10 m/s²', '12 m/s²'],
+                  correctAnswer: '6 m/s²',
+                  marks: 4,
+                  negativeMarks: 1
+                }
+              ]
+            }
+          ]
+        };
+        setExam(mockExam);
+        setTimeRemaining(mockExam.totalDuration * 60);
+      }
     } catch (error) {
       console.error('Error loading exam:', error);
       setError('Failed to load exam');
+    } finally {
       setLoading(false);
     }
+  };
+
+  const checkAccess = async () => {
+    try {
+      setAccessLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/payments/access-check?examId=${examId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setHasAccess(data.hasAccess);
+      } else {
+        setHasAccess(false);
+      }
+    } catch (error) {
+      console.error('Error checking access:', error);
+      setHasAccess(false);
+    } finally {
+      setAccessLoading(false);
+    }
+  };
+
+  const handlePaymentSuccess = () => {
+    setHasAccess(true);
+    setShowPaymentModal(false);
   };
 
   const setupProctoring = () => {
@@ -355,12 +371,12 @@ export default function LiveExam() {
     }
   };
 
-  if (loading) {
+  if (loading || accessLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading exam...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading exam...</p>
         </div>
       </div>
     );
@@ -370,13 +386,53 @@ export default function LiveExam() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <XCircleIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Exam</h2>
+          <div className="text-red-600 text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Exam</h1>
           <p className="text-gray-600 mb-4">{error}</p>
-          <Link href="/dashboard" className="text-blue-600 hover:text-blue-700">
-            Return to Dashboard
+          <Link href="/dashboard" className="text-blue-600 hover:text-blue-800">
+            ← Back to Dashboard
           </Link>
         </div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="text-yellow-600 text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Required</h1>
+          <p className="text-gray-600 mb-6">
+            This exam requires payment to access. Please purchase access to continue.
+          </p>
+          <div className="space-y-4">
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Purchase Access
+            </button>
+            <Link
+              href="/dashboard"
+              className="block w-full bg-gray-200 text-gray-800 py-3 px-6 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+        </div>
+
+        {/* Payment Modal */}
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          itemType="exam"
+          itemId={examId}
+          itemTitle={exam?.title || 'Exam'}
+          amount={500} // This would come from the exam data
+          currency="INR"
+          onSuccess={handlePaymentSuccess}
+        />
       </div>
     );
   }

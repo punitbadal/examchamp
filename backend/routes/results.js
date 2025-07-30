@@ -1,310 +1,51 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
-const asyncHandler = require('express-async-handler');
-const ExamAttempt = require('../models/ExamAttempt');
-const Question = require('../models/Question');
-const Exam = require('../models/Exam');
-
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
+const { asyncHandler } = require('../middleware/errorHandler');
+const { authenticateToken } = require('../middleware/auth');
+const ExamAttempt = require('../models/ExamAttempt');
+const Exam = require('../models/Exam');
+const User = require('../models/User');
+const Question = require('../models/Question');
 
-// @route   POST /api/results/start-attempt
-// @desc    Start a new exam attempt
+// @route   GET /api/results
+// @desc    Get exam results with filtering
 // @access  Private
-router.post('/start-attempt', [
-  body('examId').isMongoId(),
-  body('userId').isMongoId()
-], asyncHandler(async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const { examId, userId } = req.body;
-
-  // Check if exam exists and is active
-  const exam = await Exam.findById(examId);
-  if (!exam) {
-    return res.status(404).json({ error: 'Exam not found' });
-  }
-
-  const now = new Date();
-  if (now < exam.startTime) {
-    return res.status(400).json({ error: 'Exam has not started yet' });
-  }
-
-  if (now > exam.endTime) {
-    return res.status(400).json({ error: 'Exam has ended' });
-  }
-
-  // Check if user can access exam
-  if (!exam.canUserAccess(userId)) {
-    return res.status(403).json({ error: 'Access denied to this exam' });
-  }
-
-  // Check existing attempts
-  const existingAttempts = await ExamAttempt.find({ userId, examId });
-  if (existingAttempts.length >= exam.maxAttempts) {
-    return res.status(400).json({ error: 'Maximum attempts reached for this exam' });
-  }
-
-  // Check if user has an active attempt
-  const activeAttempt = existingAttempts.find(attempt => 
-    ['started', 'in_progress'].includes(attempt.status)
-  );
-
-  if (activeAttempt) {
-    return res.status(400).json({ 
-      error: 'You already have an active attempt for this exam',
-      attemptId: activeAttempt._id
-    });
-  }
-
-  // Get questions for the exam
-  const questions = await Question.find({ examId }).sort({ questionNumber: 1 });
-  if (questions.length === 0) {
-    return res.status(400).json({ error: 'No questions found for this exam' });
-  }
-
-  // Calculate max score
-  const maxScore = questions.reduce((total, question) => total + question.marks, 0);
-
-  // Create new attempt
-  const attempt = new ExamAttempt({
-    userId,
+router.get('/', authenticateToken, asyncHandler(async (req, res) => {
+  const {
     examId,
-    status: 'started',
-    startTime: new Date(),
-    maxScore,
-    timeRemaining: exam.duration * 60, // Convert to seconds
-    answers: questions.map(question => ({
-      questionId: question._id,
-      answer: null,
-      timeSpent: 0,
-      isMarkedForReview: false
-    })),
-    sections: exam.sections.map(section => ({
-      sectionId: section.name,
-      maxScore: questions
-        .filter(q => q.sectionId === section.name)
-        .reduce((total, q) => total + q.marks, 0),
-      totalQuestions: section.questionCount,
-      questionsAnswered: 0,
-      timeSpent: 0
-    }))
-  });
+    studentId,
+    status = 'completed',
+    page = 1,
+    limit = 10,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = req.query;
 
-  await attempt.save();
-
-  res.status(201).json({
-    message: 'Exam attempt started successfully',
-    attempt: {
-      id: attempt._id,
-      startTime: attempt.startTime,
-      timeRemaining: attempt.timeRemaining,
-      totalQuestions: questions.length,
-      sections: attempt.sections
-    }
-  });
-}));
-
-// @route   PUT /api/results/:attemptId/answer
-// @desc    Submit an answer for a question
-// @access  Private
-router.put('/:attemptId/answer', [
-  body('questionId').isMongoId(),
-  body('answer').notEmpty(),
-  body('timeSpent').optional().isInt({ min: 0 })
-], asyncHandler(async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const { questionId, answer, timeSpent = 0 } = req.body;
-  const attemptId = req.params.attemptId;
-
-  const attempt = await ExamAttempt.findById(attemptId);
-  if (!attempt) {
-    return res.status(404).json({ error: 'Attempt not found' });
-  }
-
-  // Check if attempt is still valid
-  if (!attempt.isValid()) {
-    return res.status(400).json({ error: 'Attempt is no longer valid' });
-  }
-
-  // Get the question to calculate score
-  const question = await Question.findById(questionId);
-  if (!question) {
-    return res.status(404).json({ error: 'Question not found' });
-  }
-
-  // Calculate score
-  const score = question.calculateScore(answer);
-  const isCorrect = question.isCorrect(answer);
-
-  // Update answer
-  attempt.updateAnswer(questionId, answer, timeSpent);
-
-  // Update the answer object with calculated values
-  const answerObj = attempt.answers.find(a => a.questionId.toString() === questionId.toString());
-  if (answerObj) {
-    answerObj.score = score;
-    answerObj.isCorrect = isCorrect;
-  }
-
-  // Update attempt status
-  if (attempt.status === 'started') {
-    attempt.status = 'in_progress';
-  }
-
-  await attempt.save();
-
-  res.json({
-    message: 'Answer submitted successfully',
-    score,
-    isCorrect
-  });
-}));
-
-// @route   PUT /api/results/:attemptId/mark-review
-// @desc    Mark question for review
-// @access  Private
-router.put('/:attemptId/mark-review', [
-  body('questionId').isMongoId(),
-  body('isMarked').isBoolean()
-], asyncHandler(async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const { questionId, isMarked } = req.body;
-  const attemptId = req.params.attemptId;
-
-  const attempt = await ExamAttempt.findById(attemptId);
-  if (!attempt) {
-    return res.status(404).json({ error: 'Attempt not found' });
-  }
-
-  attempt.markForReview(questionId, isMarked);
-  await attempt.save();
-
-  res.json({ message: 'Question review status updated' });
-}));
-
-// @route   POST /api/results/:attemptId/submit
-// @desc    Submit exam attempt
-// @access  Private
-router.post('/:attemptId/submit', asyncHandler(async (req, res) => {
-  const attemptId = req.params.attemptId;
-
-  const attempt = await ExamAttempt.findById(attemptId);
-  if (!attempt) {
-    return res.status(404).json({ error: 'Attempt not found' });
-  }
-
-  if (attempt.status === 'submitted' || attempt.status === 'completed') {
-    return res.status(400).json({ error: 'Attempt already submitted' });
-  }
-
-  // Calculate final score
-  const questions = await Question.find({ examId: attempt.examId });
-  let totalScore = 0;
-
-  for (const answer of attempt.answers) {
-    const question = questions.find(q => q._id.toString() === answer.questionId.toString());
-    if (question && answer.answer !== null && answer.answer !== undefined) {
-      const score = question.calculateScore(answer.answer);
-      answer.score = score;
-      answer.isCorrect = question.isCorrect(answer.answer);
-      totalScore += score;
-    }
-  }
-
-  // Update attempt
-  attempt.totalScore = totalScore;
-  attempt.percentage = attempt.maxScore > 0 ? Math.round((totalScore / attempt.maxScore) * 100) : 0;
-  attempt.status = 'submitted';
-  attempt.submittedAt = new Date();
-  attempt.endTime = new Date();
-
-  await attempt.save();
-
-  // Calculate rank and percentile
-  const allAttempts = await ExamAttempt.find({
-    examId: attempt.examId,
-    status: { $in: ['submitted', 'completed'] }
-  }).sort({ totalScore: -1, submittedAt: 1 });
-
-  const rank = allAttempts.findIndex(a => a._id.toString() === attemptId.toString()) + 1;
-  const percentile = Math.round(((allAttempts.length - rank + 1) / allAttempts.length) * 100);
-
-  attempt.rank = rank;
-  attempt.percentile = percentile;
-  await attempt.save();
-
-  res.json({
-    message: 'Exam submitted successfully',
-    result: {
-      totalScore: attempt.totalScore,
-      maxScore: attempt.maxScore,
-      percentage: attempt.percentage,
-      rank,
-      percentile,
-      timeSpent: attempt.timeSpent,
-      submittedAt: attempt.submittedAt
-    }
-  });
-}));
-
-// @route   GET /api/results/:attemptId
-// @desc    Get attempt details
-// @access  Private
-router.get('/:attemptId', asyncHandler(async (req, res) => {
-  const attempt = await ExamAttempt.findById(req.params.attemptId)
-    .populate('userId', 'firstName lastName email studentId')
-    .populate('examId', 'title duration totalMarks');
-
-  if (!attempt) {
-    return res.status(404).json({ error: 'Attempt not found' });
-  }
-
-  // Get questions with correct answers for completed attempts
-  let questions = [];
-  if (attempt.status === 'submitted' || attempt.status === 'completed') {
-    questions = await Question.find({ examId: attempt.examId })
-      .sort({ questionNumber: 1 });
-  }
-
-  res.json({
-    attempt,
-    questions: questions.map(q => q.getPreview()),
-    summary: attempt.getSummary()
-  });
-}));
-
-// @route   GET /api/results/user/:userId
-// @desc    Get user's exam attempts
-// @access  Private
-router.get('/user/:userId', asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, status } = req.query;
+  const query = { status };
   
-  const query = { userId: req.params.userId };
-  if (status) query.status = status;
+  if (examId) query.examId = examId;
+  if (studentId) query.userId = studentId;
+  
+  // Admin can see all results, students can only see their own
+  if (req.user.role === 'student') {
+    query.userId = req.user.id;
+  }
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
+  const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
 
   const attempts = await ExamAttempt.find(query)
-    .populate('examId', 'title examType category')
-    .sort({ startTime: -1 })
+    .populate('examId', 'title examCode totalMarks passingScore')
+    .populate('userId', 'firstName lastName email')
+    .sort(sort)
     .skip(skip)
     .limit(parseInt(limit));
 
   const total = await ExamAttempt.countDocuments(query);
 
   res.json({
-    attempts,
+    results: attempts,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -314,58 +55,256 @@ router.get('/user/:userId', asyncHandler(async (req, res) => {
   });
 }));
 
-// @route   GET /api/results/analytics/:examId
-// @desc    Get exam analytics (Admin only)
-// @access  Private (Admin only)
-router.get('/analytics/:examId', asyncHandler(async (req, res) => {
-  const examId = req.params.examId;
+// @route   GET /api/results/:attemptId
+// @desc    Get detailed result for a specific attempt
+// @access  Private
+router.get('/:attemptId', authenticateToken, asyncHandler(async (req, res) => {
+  const { attemptId } = req.params;
 
-  const attempts = await ExamAttempt.find({
-    examId,
-    status: { $in: ['submitted', 'completed'] }
-  }).populate('userId', 'firstName lastName studentId');
+  const attempt = await ExamAttempt.findById(attemptId)
+    .populate('examId', 'title examCode totalMarks passingScore sections')
+    .populate('userId', 'firstName lastName email');
 
-  if (attempts.length === 0) {
-    return res.json({
-      totalAttempts: 0,
-      averageScore: 0,
-      averagePercentage: 0,
-      highestScore: 0,
-      lowestScore: 0,
-      scoreDistribution: {},
-      timeDistribution: {},
-      sectionAnalytics: {}
+  if (!attempt) {
+    return res.status(404).json({ message: 'Result not found' });
+  }
+
+  // Check if user has access to this result
+  if (req.user.role === 'student' && attempt.userId.toString() !== req.user.id) {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  // Calculate detailed analytics
+  const analytics = {
+    totalQuestions: attempt.answers.length,
+    correctAnswers: attempt.answers.filter(a => a.isCorrect).length,
+    incorrectAnswers: attempt.answers.filter(a => !a.isCorrect && a.isAnswered).length,
+    unansweredQuestions: attempt.answers.filter(a => !a.isAnswered).length,
+    accuracy: ((attempt.answers.filter(a => a.isCorrect).length / attempt.answers.length) * 100).toFixed(2),
+    timeSpent: attempt.duration,
+    averageTimePerQuestion: attempt.duration / attempt.answers.length,
+    sectionPerformance: []
+  };
+
+  // Calculate section-wise performance
+  if (attempt.examId.sections) {
+    attempt.examId.sections.forEach((section, index) => {
+      const sectionAnswers = attempt.answers.filter(a => a.sectionIndex === index);
+      const correctInSection = sectionAnswers.filter(a => a.isCorrect).length;
+      
+      analytics.sectionPerformance.push({
+        sectionName: section.name,
+        totalQuestions: sectionAnswers.length,
+        correctAnswers: correctInSection,
+        accuracy: sectionAnswers.length > 0 ? ((correctInSection / sectionAnswers.length) * 100).toFixed(2) : 0,
+        timeSpent: sectionAnswers.reduce((sum, a) => sum + (a.timeSpent || 0), 0)
+      });
     });
   }
 
-  const scores = attempts.map(a => a.totalScore);
-  const percentages = attempts.map(a => a.percentage);
-  const timeSpent = attempts.map(a => a.timeSpent);
+  res.json({
+    result: attempt,
+    analytics
+  });
+}));
+
+// @route   POST /api/results
+// @desc    Submit exam result
+// @access  Private
+router.post('/', [
+  authenticateToken,
+  body('examId').isMongoId().withMessage('Valid exam ID is required'),
+  body('answers').isArray().withMessage('Answers array is required'),
+  body('duration').isInt({ min: 0 }).withMessage('Valid duration is required')
+], asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { examId, answers, duration, proctoringData } = req.body;
+  const userId = req.user.id;
+
+  // Check if user has already attempted this exam
+  const existingAttempt = await ExamAttempt.findOne({ examId, userId });
+  if (existingAttempt) {
+    return res.status(400).json({ message: 'You have already attempted this exam' });
+  }
+
+  // Get exam details
+  const exam = await Exam.findById(examId);
+  if (!exam) {
+    return res.status(404).json({ message: 'Exam not found' });
+  }
+
+  // Calculate results
+  let totalScore = 0;
+  let correctAnswers = 0;
+  let totalMarks = 0;
+
+  answers.forEach(answer => {
+    if (answer.isCorrect) {
+      correctAnswers++;
+      totalScore += answer.marks || 0;
+    }
+    totalMarks += answer.marks || 0;
+  });
+
+  const percentage = totalMarks > 0 ? (totalScore / totalMarks) * 100 : 0;
+  const isPassed = percentage >= exam.passingScore;
+
+  // Create exam attempt
+  const examAttempt = new ExamAttempt({
+    examId,
+    userId,
+    answers,
+    duration,
+    totalScore,
+    totalMarks,
+    percentage,
+    isPassed,
+    status: 'completed',
+    submittedAt: new Date(),
+    proctoring: proctoringData || {}
+  });
+
+  await examAttempt.save();
+
+  res.status(201).json({
+    message: 'Exam result submitted successfully',
+    result: examAttempt
+  });
+}));
+
+// @route   GET /api/results/analytics/:examId
+// @desc    Get analytics for a specific exam
+// @access  Private (Admin/Instructor)
+router.get('/analytics/:examId', authenticateToken, asyncHandler(async (req, res) => {
+  const { examId } = req.params;
+
+  // Check if user is admin or instructor
+  if (req.user.role !== 'admin' && req.user.role !== 'instructor') {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  const attempts = await ExamAttempt.find({ examId, status: 'completed' })
+    .populate('userId', 'firstName lastName email');
+
+  if (attempts.length === 0) {
+    return res.json({
+      examId,
+      totalAttempts: 0,
+      averageScore: 0,
+      passRate: 0,
+      scoreDistribution: {},
+      timeAnalysis: {},
+      questionAnalysis: []
+    });
+  }
+
+  // Calculate analytics
+  const totalAttempts = attempts.length;
+  const averageScore = attempts.reduce((sum, a) => sum + a.percentage, 0) / totalAttempts;
+  const passRate = (attempts.filter(a => a.isPassed).length / totalAttempts) * 100;
+
+  // Score distribution
+  const scoreDistribution = {
+    '0-20': attempts.filter(a => a.percentage <= 20).length,
+    '21-40': attempts.filter(a => a.percentage > 20 && a.percentage <= 40).length,
+    '41-60': attempts.filter(a => a.percentage > 40 && a.percentage <= 60).length,
+    '61-80': attempts.filter(a => a.percentage > 60 && a.percentage <= 80).length,
+    '81-100': attempts.filter(a => a.percentage > 80).length
+  };
+
+  // Time analysis
+  const completionTimes = attempts.map(a => a.duration);
+  const averageTime = completionTimes.reduce((sum, time) => sum + time, 0) / totalAttempts;
+
+  // Question analysis
+  const questionAnalysis = [];
+  if (attempts.length > 0) {
+    const firstAttempt = attempts[0];
+    firstAttempt.answers.forEach((answer, index) => {
+      const correctCount = attempts.filter(a => a.answers[index]?.isCorrect).length;
+      const difficulty = (correctCount / totalAttempts) * 100;
+      
+      questionAnalysis.push({
+        questionIndex: index,
+        correctCount,
+        difficulty: difficulty.toFixed(2),
+        averageTime: attempts.reduce((sum, a) => sum + (a.answers[index]?.timeSpent || 0), 0) / totalAttempts
+      });
+    });
+  }
+
+  res.json({
+    examId,
+    totalAttempts,
+    averageScore: averageScore.toFixed(2),
+    passRate: passRate.toFixed(2),
+    scoreDistribution,
+    timeAnalysis: {
+      averageTime: Math.round(averageTime),
+      fastestCompletion: Math.min(...completionTimes),
+      slowestCompletion: Math.max(...completionTimes)
+    },
+    questionAnalysis
+  });
+}));
+
+// @route   GET /api/results/student/:studentId
+// @desc    Get all results for a specific student
+// @access  Private (Admin/Instructor or own results)
+router.get('/student/:studentId', authenticateToken, asyncHandler(async (req, res) => {
+  const { studentId } = req.params;
+
+  // Check access permissions
+  if (req.user.role === 'student' && req.user.id !== studentId) {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  const attempts = await ExamAttempt.find({ userId: studentId, status: 'completed' })
+    .populate('examId', 'title examCode totalMarks')
+    .sort({ createdAt: -1 });
 
   const analytics = {
     totalAttempts: attempts.length,
-    averageScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
-    averagePercentage: Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length),
-    highestScore: Math.max(...scores),
-    lowestScore: Math.min(...scores),
-    averageTimeSpent: Math.round(timeSpent.reduce((a, b) => a + b, 0) / timeSpent.length),
-    scoreDistribution: {
-      '90-100%': percentages.filter(p => p >= 90).length,
-      '80-89%': percentages.filter(p => p >= 80 && p < 90).length,
-      '70-79%': percentages.filter(p => p >= 70 && p < 80).length,
-      '60-69%': percentages.filter(p => p >= 60 && p < 70).length,
-      '50-59%': percentages.filter(p => p >= 50 && p < 60).length,
-      'Below 50%': percentages.filter(p => p < 50).length
-    },
-    timeDistribution: {
-      '0-30 min': timeSpent.filter(t => t <= 1800).length,
-      '30-60 min': timeSpent.filter(t => t > 1800 && t <= 3600).length,
-      '60-90 min': timeSpent.filter(t => t > 3600 && t <= 5400).length,
-      '90+ min': timeSpent.filter(t => t > 5400).length
-    }
+    averageScore: attempts.length > 0 ? 
+      attempts.reduce((sum, a) => sum + a.percentage, 0) / attempts.length : 0,
+    passRate: attempts.length > 0 ? 
+      (attempts.filter(a => a.isPassed).length / attempts.length) * 100 : 0,
+    totalTimeSpent: attempts.reduce((sum, a) => sum + a.duration, 0),
+    recentPerformance: attempts.slice(0, 5).map(a => ({
+      examTitle: a.examId.title,
+      score: a.percentage,
+      date: a.submittedAt
+    }))
   };
 
-  res.json(analytics);
+  res.json({
+    results: attempts,
+    analytics
+  });
+}));
+
+// @route   DELETE /api/results/:attemptId
+// @desc    Delete a result (Admin only)
+// @access  Private (Admin)
+router.delete('/:attemptId', authenticateToken, asyncHandler(async (req, res) => {
+  const { attemptId } = req.params;
+
+  // Check if user is admin
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  const attempt = await ExamAttempt.findByIdAndDelete(attemptId);
+  
+  if (!attempt) {
+    return res.status(404).json({ message: 'Result not found' });
+  }
+
+  res.json({ message: 'Result deleted successfully' });
 }));
 
 module.exports = router; 

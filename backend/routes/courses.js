@@ -8,6 +8,45 @@ const Question = require('../models/Question');
 
 const router = express.Router();
 
+// @route   GET /api/courses/subjects
+// @desc    Get all subjects with material and test counts
+// @access  Public
+router.get('/subjects', asyncHandler(async (req, res) => {
+  try {
+    // Get unique subjects from questions and study materials
+    const subjects = await Question.aggregate([
+      {
+        $group: {
+          _id: '$subject',
+          materialCount: { $sum: 1 },
+          testCount: { $sum: { $cond: [{ $eq: ['$questionType', 'mcq'] }, 1, 0] } }
+        }
+      },
+      {
+        $project: {
+          name: '$_id',
+          materialCount: 1,
+          testCount: 1,
+          _id: 0
+        }
+      },
+      {
+        $sort: { name: 1 }
+      }
+    ]);
+
+    // Add IDs to each subject
+    const subjectsWithIds = subjects.map((subject, index) => ({
+      id: (index + 1).toString(),
+      ...subject
+    }));
+
+    res.json({ subjects: subjectsWithIds });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching subjects', error: error.message });
+  }
+}));
+
 // @route   GET /api/courses
 // @desc    Get all courses with filtering
 // @access  Public
