@@ -44,17 +44,38 @@ interface ExamSection {
   instructions: string;
 }
 
+interface Subject {
+  _id: string;
+  name: string;
+  code: string;
+  category: string;
+}
+
+interface Chapter {
+  _id: string;
+  name: string;
+  code: string;
+  chapterNumber: number;
+  subjectId: string;
+}
+
+interface Topic {
+  _id: string;
+  name: string;
+  code: string;
+  topicNumber: number;
+  chapterId: string;
+}
+
 interface ExamForm {
   title: string;
   examCode: string;
   description: string;
   examType: 'live' | 'practice' | 'mock';
-  template: 'jee_main' | 'neet' | 'cat' | 'upsc' | 'custom';
+  template: 'jee_main' | 'neet' | 'cat' | 'upsc' | 'gate' | 'gre' | 'ielts' | 'toefl' | 'custom';
   totalDuration: number;
   totalMarks: number;
   sections: ExamSection[];
-  startTime: string;
-  endTime: string;
   maxAttempts: number;
   passingScore: number;
   isActive: boolean;
@@ -79,12 +100,13 @@ interface ExamFormErrors {
   totalDuration?: string;
   totalMarks?: string;
   sections?: string;
-  startTime?: string;
-  endTime?: string;
 }
 
 export default function CreateExam() {
   const router = useRouter();
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [formData, setFormData] = useState<ExamForm>({
     title: '',
     examCode: '',
@@ -94,8 +116,6 @@ export default function CreateExam() {
     totalDuration: 180,
     totalMarks: 300,
     sections: [],
-    startTime: '',
-    endTime: '',
     maxAttempts: 1,
     passingScore: 150,
     isActive: true,
@@ -116,7 +136,8 @@ export default function CreateExam() {
   const [selectedQuestions, setSelectedQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<ExamFormErrors>({});
-  const [activeTab, setActiveTab] = useState<'basic' | 'sections' | 'questions' | 'settings' | 'proctoring'>('basic');
+  const [activeTab, setActiveTab] = useState<any>('basic');
+  const [selectedSectionId, setSelectedSectionId] = useState<string>('');
 
   useEffect(() => {
     // Check if user is authenticated and is admin
@@ -136,11 +157,66 @@ export default function CreateExam() {
       }
       
       loadQuestions();
+      loadSubjects();
     } catch (error) {
       console.error('Error parsing user data:', error);
       router.push('/');
     }
   }, [router]);
+
+  const loadSubjects = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/subjects', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSubjects(data.data.docs || data.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading subjects:', error);
+    }
+  };
+
+  const loadChapters = async (subjectId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/chapters?subjectId=${subjectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setChapters(data.data.docs || data.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading chapters:', error);
+    }
+  };
+
+  const loadTopics = async (chapterId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/topics?chapterId=${chapterId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTopics(data.data.docs || data.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading topics:', error);
+    }
+  };
 
   const loadQuestions = async () => {
     try {
@@ -206,20 +282,7 @@ export default function CreateExam() {
       [name]: type === 'checkbox' ? checked : value
     }));
 
-    // Auto-calculate end time when start time or duration changes
-    if (name === 'startTime' || name === 'totalDuration') {
-      const newStartTime = name === 'startTime' ? value : formData.startTime;
-      const newDuration = name === 'totalDuration' ? parseInt(value) : formData.totalDuration;
-      
-      if (newStartTime && newDuration) {
-        const startDate = new Date(newStartTime);
-        const endDate = new Date(startDate.getTime() + newDuration * 60 * 1000);
-        setFormData(prev => ({
-          ...prev,
-          endTime: endDate.toISOString().slice(0, 16)
-        }));
-      }
-    }
+
 
     // Clear error when user starts typing
     if (errors[name as keyof ExamFormErrors]) {
@@ -247,40 +310,114 @@ export default function CreateExam() {
     const templates = {
       jee_main: {
         title: 'JEE Main Mock Test',
+        description: 'Engineering entrance exam with Physics, Chemistry, and Mathematics sections',
         totalDuration: 180,
         totalMarks: 300,
+        examType: 'mock' as const,
+        maxAttempts: 1,
+        passingScore: 150,
         sections: [
-          { id: '1', name: 'Physics', subject: 'Physics', duration: 60, totalMarks: 100, questions: [], instructions: 'Physics section with 25 questions' },
-          { id: '2', name: 'Chemistry', subject: 'Chemistry', duration: 60, totalMarks: 100, questions: [], instructions: 'Chemistry section with 25 questions' },
-          { id: '3', name: 'Mathematics', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Mathematics section with 25 questions' }
+          { id: '1', name: 'Physics', subject: 'Physics', duration: 60, totalMarks: 100, questions: [], instructions: 'Physics section with 25 questions (4 marks each)' },
+          { id: '2', name: 'Chemistry', subject: 'Chemistry', duration: 60, totalMarks: 100, questions: [], instructions: 'Chemistry section with 25 questions (4 marks each)' },
+          { id: '3', name: 'Mathematics', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Mathematics section with 25 questions (4 marks each)' }
         ]
       },
       neet: {
         title: 'NEET Mock Test',
+        description: 'Medical entrance exam with Physics, Chemistry, and Biology sections',
         totalDuration: 200,
         totalMarks: 720,
+        examType: 'mock' as const,
+        maxAttempts: 1,
+        passingScore: 360,
         sections: [
-          { id: '1', name: 'Physics', subject: 'Physics', duration: 50, totalMarks: 180, questions: [], instructions: 'Physics section with 45 questions' },
-          { id: '2', name: 'Chemistry', subject: 'Chemistry', duration: 50, totalMarks: 180, questions: [], instructions: 'Chemistry section with 45 questions' },
-          { id: '3', name: 'Biology', subject: 'Biology', duration: 100, totalMarks: 360, questions: [], instructions: 'Biology section with 90 questions' }
+          { id: '1', name: 'Physics', subject: 'Physics', duration: 50, totalMarks: 180, questions: [], instructions: 'Physics section with 45 questions (4 marks each)' },
+          { id: '2', name: 'Chemistry', subject: 'Chemistry', duration: 50, totalMarks: 180, questions: [], instructions: 'Chemistry section with 45 questions (4 marks each)' },
+          { id: '3', name: 'Biology', subject: 'Biology', duration: 100, totalMarks: 360, questions: [], instructions: 'Biology section with 90 questions (4 marks each)' }
         ]
       },
       cat: {
         title: 'CAT Mock Test',
+        description: 'Management entrance exam with Verbal, DI, and Quant sections',
         totalDuration: 180,
         totalMarks: 300,
+        examType: 'mock' as const,
+        maxAttempts: 1,
+        passingScore: 150,
         sections: [
-          { id: '1', name: 'Verbal Ability', subject: 'English', duration: 60, totalMarks: 100, questions: [], instructions: 'Verbal Ability section' },
-          { id: '2', name: 'Data Interpretation', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Data Interpretation section' },
-          { id: '3', name: 'Quantitative Aptitude', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Quantitative Aptitude section' }
+          { id: '1', name: 'Verbal Ability', subject: 'English', duration: 60, totalMarks: 100, questions: [], instructions: 'Verbal Ability section with 34 questions' },
+          { id: '2', name: 'Data Interpretation', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Data Interpretation section with 32 questions' },
+          { id: '3', name: 'Quantitative Aptitude', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Quantitative Aptitude section with 34 questions' }
         ]
       },
       upsc: {
         title: 'UPSC Prelims Mock',
+        description: 'Civil services preliminary examination',
         totalDuration: 120,
         totalMarks: 200,
+        examType: 'mock' as const,
+        maxAttempts: 1,
+        passingScore: 100,
         sections: [
-          { id: '1', name: 'General Studies', subject: 'General Knowledge', duration: 120, totalMarks: 200, questions: [], instructions: 'General Studies section with 100 questions' }
+          { id: '1', name: 'General Studies', subject: 'General Knowledge', duration: 120, totalMarks: 200, questions: [], instructions: 'General Studies section with 100 questions (2 marks each)' }
+        ]
+      },
+      gate: {
+        title: 'GATE Mock Test',
+        description: 'Graduate Aptitude Test in Engineering',
+        totalDuration: 180,
+        totalMarks: 100,
+        examType: 'mock' as const,
+        maxAttempts: 1,
+        passingScore: 50,
+        sections: [
+          { id: '1', name: 'General Aptitude', subject: 'English', duration: 30, totalMarks: 15, questions: [], instructions: 'General Aptitude section with 10 questions' },
+          { id: '2', name: 'Core Subject', subject: 'Engineering', duration: 150, totalMarks: 85, questions: [], instructions: 'Core subject section with 55 questions' }
+        ]
+      },
+      gre: {
+        title: 'GRE Mock Test',
+        description: 'Graduate Record Examination',
+        totalDuration: 205,
+        totalMarks: 340,
+        examType: 'mock' as const,
+        maxAttempts: 1,
+        passingScore: 170,
+        sections: [
+          { id: '1', name: 'Verbal Reasoning', subject: 'English', duration: 30, totalMarks: 170, questions: [], instructions: 'Verbal Reasoning section with 20 questions' },
+          { id: '2', name: 'Quantitative Reasoning', subject: 'Mathematics', duration: 35, totalMarks: 170, questions: [], instructions: 'Quantitative Reasoning section with 20 questions' },
+          { id: '3', name: 'Analytical Writing', subject: 'English', duration: 60, totalMarks: 6, questions: [], instructions: 'Analytical Writing section with 2 essays' },
+          { id: '4', name: 'Research Section', subject: 'Mixed', duration: 80, totalMarks: 0, questions: [], instructions: 'Research section (unscored)' }
+        ]
+      },
+      ielts: {
+        title: 'IELTS Mock Test',
+        description: 'International English Language Testing System',
+        totalDuration: 175,
+        totalMarks: 9,
+        examType: 'mock' as const,
+        maxAttempts: 1,
+        passingScore: 6,
+        sections: [
+          { id: '1', name: 'Listening', subject: 'English', duration: 30, totalMarks: 9, questions: [], instructions: 'Listening section with 40 questions' },
+          { id: '2', name: 'Reading', subject: 'English', duration: 60, totalMarks: 9, questions: [], instructions: 'Reading section with 40 questions' },
+          { id: '3', name: 'Writing', subject: 'English', duration: 60, totalMarks: 9, questions: [], instructions: 'Writing section with 2 tasks' },
+          { id: '4', name: 'Speaking', subject: 'English', duration: 15, totalMarks: 9, questions: [], instructions: 'Speaking section with 3 parts' }
+        ]
+      },
+      toefl: {
+        title: 'TOEFL Mock Test',
+        description: 'Test of English as a Foreign Language',
+        totalDuration: 200,
+        totalMarks: 120,
+        examType: 'mock' as const,
+        maxAttempts: 1,
+        passingScore: 80,
+        sections: [
+          { id: '1', name: 'Reading', subject: 'English', duration: 54, totalMarks: 30, questions: [], instructions: 'Reading section with 30 questions' },
+          { id: '2', name: 'Listening', subject: 'English', duration: 41, totalMarks: 30, questions: [], instructions: 'Listening section with 28 questions' },
+          { id: '3', name: 'Speaking', subject: 'English', duration: 17, totalMarks: 30, questions: [], instructions: 'Speaking section with 4 tasks' },
+          { id: '4', name: 'Writing', subject: 'English', duration: 50, totalMarks: 30, questions: [], instructions: 'Writing section with 2 tasks' }
         ]
       }
     };
@@ -291,8 +428,12 @@ export default function CreateExam() {
         ...prev,
         template: template as ExamForm['template'],
         title: selectedTemplate.title,
+        description: selectedTemplate.description || prev.description,
+        examType: selectedTemplate.examType || prev.examType,
         totalDuration: selectedTemplate.totalDuration,
         totalMarks: selectedTemplate.totalMarks,
+        maxAttempts: selectedTemplate.maxAttempts || prev.maxAttempts,
+        passingScore: selectedTemplate.passingScore || prev.passingScore,
         sections: selectedTemplate.sections
       }));
     }
@@ -379,44 +520,26 @@ export default function CreateExam() {
       newErrors.sections = 'At least one section is required';
     }
 
-    // Different validation for different exam types
-    if (formData.examType === 'live') {
-      // Live exams require start and end times
-      if (!formData.startTime) {
-        newErrors.startTime = 'Start time is required for live exams';
-      }
-      if (!formData.endTime) {
-        newErrors.endTime = 'End time is required for live exams';
-      }
-      
-      // Validate that end time is after start time
-      if (formData.startTime && formData.endTime) {
-        const startDate = new Date(formData.startTime);
-        const endDate = new Date(formData.endTime);
-        if (endDate <= startDate) {
-          newErrors.endTime = 'End time must be after start time';
-        }
-      }
-    } else {
-      // Practice and mock tests don't require specific start/end times
-      // They can be available anytime
-      if (!formData.startTime) {
-        // Set a default start time (now) for practice/mock tests
-        setFormData(prev => ({
-          ...prev,
-          startTime: new Date().toISOString().slice(0, 16)
-        }));
-      }
-      if (!formData.endTime) {
-        // Set a default end time (1 year from now) for practice/mock tests
-        const defaultEndTime = new Date();
-        defaultEndTime.setFullYear(defaultEndTime.getFullYear() + 1);
-        setFormData(prev => ({
-          ...prev,
-          endTime: defaultEndTime.toISOString().slice(0, 16)
-        }));
-      }
+    // Validate section totals match exam totals
+    const totalSectionDuration = formData.sections.reduce((sum, section) => sum + section.duration, 0);
+    const totalSectionMarks = formData.sections.reduce((sum, section) => sum + section.totalMarks, 0);
+
+    if (totalSectionDuration !== formData.totalDuration) {
+      newErrors.totalDuration = `Section durations (${totalSectionDuration} min) must equal exam duration (${formData.totalDuration} min)`;
     }
+
+    if (totalSectionMarks !== formData.totalMarks) {
+      newErrors.totalMarks = `Section marks (${totalSectionMarks}) must equal exam marks (${formData.totalMarks})`;
+    }
+
+    // Validate each section has questions
+    formData.sections.forEach((section, index) => {
+      if (section.questions.length === 0) {
+        newErrors.sections = `Section "${section.name}" must have at least one question`;
+      }
+    });
+
+
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -441,8 +564,6 @@ export default function CreateExam() {
         description: formData.description,
         totalMarks: formData.totalMarks,
         duration: formData.totalDuration,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
         examType: formData.examType,
         maxAttempts: formData.maxAttempts,
         passingScore: formData.passingScore,
@@ -521,6 +642,15 @@ export default function CreateExam() {
 
   const totalSelectedQuestions = formData.sections.reduce((total, section) => total + section.questions.length, 0);
   const totalSelectedMarks = formData.sections.reduce((total, section) => total + section.questions.reduce((sum, q) => sum + q.marks, 0), 0);
+  const totalSectionDuration = formData.sections.reduce((total, section) => total + section.duration, 0);
+
+  // Filter questions by selected section's subject
+  const filteredQuestions = selectedSectionId 
+    ? availableQuestions.filter(question => {
+        const selectedSection = formData.sections.find(s => s.id === selectedSectionId);
+        return selectedSection && question.subject === selectedSection.subject;
+      })
+    : [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -563,7 +693,7 @@ export default function CreateExam() {
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">Create New Exam</h1>
           <p className="text-gray-600 mt-2">
-            Build a comprehensive exam with sections, questions, and advanced settings.
+            Build exam structure, questions, and settings. Schedule the exam later via the Schedule page.
           </p>
         </div>
 
@@ -579,12 +709,26 @@ export default function CreateExam() {
               <div className="text-sm text-gray-600">Questions</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-purple-600">{totalSelectedMarks}</div>
+              <div className={`text-2xl font-bold ${totalSelectedMarks === formData.totalMarks ? 'text-purple-600' : 'text-red-600'}`}>
+                {totalSelectedMarks} / {formData.totalMarks}
+              </div>
               <div className="text-sm text-gray-600">Total Marks</div>
+              {totalSelectedMarks !== formData.totalMarks && (
+                <div className="text-xs text-red-500 mt-1">
+                  {totalSelectedMarks > formData.totalMarks ? 'Exceeds limit' : 'Below target'}
+                </div>
+              )}
             </div>
             <div>
-              <div className="text-2xl font-bold text-orange-600">{formData.totalDuration}</div>
+              <div className={`text-2xl font-bold ${totalSectionDuration === formData.totalDuration ? 'text-orange-600' : 'text-red-600'}`}>
+                {totalSectionDuration} / {formData.totalDuration}
+              </div>
               <div className="text-sm text-gray-600">Minutes</div>
+              {totalSectionDuration !== formData.totalDuration && (
+                <div className="text-xs text-red-500 mt-1">
+                  {totalSectionDuration > formData.totalDuration ? 'Exceeds limit' : 'Below target'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -765,7 +909,11 @@ export default function CreateExam() {
                       { id: 'jee_main', name: 'JEE Main', desc: 'Engineering entrance' },
                       { id: 'neet', name: 'NEET', desc: 'Medical entrance' },
                       { id: 'cat', name: 'CAT', desc: 'Management entrance' },
-                      { id: 'upsc', name: 'UPSC', desc: 'Civil services' }
+                      { id: 'upsc', name: 'UPSC', desc: 'Civil services' },
+                      { id: 'gate', name: 'GATE', desc: 'Graduate aptitude' },
+                      { id: 'gre', name: 'GRE', desc: 'Graduate record' },
+                      { id: 'ielts', name: 'IELTS', desc: 'English language' },
+                      { id: 'toefl', name: 'TOEFL', desc: 'English proficiency' }
                     ].map((template) => (
                       <button
                         key={template.id}
@@ -854,7 +1002,7 @@ export default function CreateExam() {
                       <div className="space-y-2">
                         <div className="font-medium text-blue-600">Live Exam</div>
                         <ul className="text-gray-600 space-y-1">
-                          <li>• Scheduled start/end times</li>
+                          <li>• Scheduled via Schedule page</li>
                           <li>• Proctoring enabled</li>
                           <li>• Single attempt only</li>
                           <li>• Real-time monitoring</li>
@@ -882,80 +1030,33 @@ export default function CreateExam() {
                   </div>
                 </div>
 
-                {/* Schedule Section - Only for Live Exams */}
-                {formData.examType === 'live' && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Schedule (Live Exam)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Start Time *
-                        </label>
-                        <input
-                          type="datetime-local"
-                          name="startTime"
-                          value={formData.startTime}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
-                            errors.startTime ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                        />
-                        {errors.startTime && (
-                          <p className="mt-1 text-sm text-red-600">{errors.startTime}</p>
-                        )}
+                {/* Scheduling Information */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Scheduling Information</h3>
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
                       </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          End Time (Auto-calculated)
-                        </label>
-                        <input
-                          type="datetime-local"
-                          name="endTime"
-                          value={formData.endTime}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
-                            errors.endTime ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                          readOnly
-                        />
-                        {errors.endTime && (
-                          <p className="mt-1 text-sm text-red-600">{errors.endTime}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          End time is automatically calculated as: Start Time + Duration
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Availability Section - For Practice and Mock Tests */}
-                {formData.examType !== 'live' && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Availability</h3>
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <div className="ml-3">
-                          <h3 className="text-sm font-medium text-blue-800">
-                            {formData.examType === 'practice' ? 'Practice Test' : 'Mock Test'} Availability
-                          </h3>
-                          <div className="mt-2 text-sm text-blue-700">
-                            <p>This {formData.examType === 'practice' ? 'practice test' : 'mock test'} will be available to students anytime between:</p>
-                            <p className="mt-1 font-medium">
-                              {formData.startTime ? new Date(formData.startTime).toLocaleString() : 'Now'} - {formData.endTime ? new Date(formData.endTime).toLocaleString() : '1 year from now'}
-                            </p>
-                          </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-blue-800">
+                          Exam Scheduling
+                        </h3>
+                        <div className="mt-2 text-sm text-blue-700">
+                          <p>This exam will be created as a draft. To schedule it for students:</p>
+                          <ul className="mt-1 list-disc list-inside">
+                            <li>Go to <strong>Admin → Exams → Schedule</strong></li>
+                            <li>Select this exam and set start/end times</li>
+                            <li>Configure participant limits and proctoring settings</li>
+                            <li>Activate the schedule when ready</li>
+                          </ul>
                         </div>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -1086,39 +1187,65 @@ export default function CreateExam() {
                     <p className="text-gray-500">Please add sections first before selecting questions.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Available Questions */}
+                  <div className="space-y-6">
+                    {/* Section Selection */}
                     <div>
-                      <h4 className="text-md font-medium text-gray-900 mb-4">Available Questions</h4>
-                      <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {availableQuestions.map((question) => (
-                          <div
-                            key={question.id}
-                            className="border border-gray-200 rounded-lg p-3 hover:border-blue-300 cursor-pointer"
-                            onClick={() => {
-                              if (formData.sections.length > 0) {
-                                addQuestionToSection(formData.sections[0].id, question);
-                              }
-                            }}
-                          >
-                            <div className="text-sm font-medium text-gray-900 mb-1">
-                              {question.questionText.substring(0, 100)}...
-                            </div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500">
-                              <span className={`px-2 py-1 rounded-full ${
-                                question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
-                                question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {question.difficulty}
-                              </span>
-                              <span>{question.subject}</span>
-                              <span>{question.marks} marks</span>
-                            </div>
-                          </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Section to Add Questions
+                      </label>
+                      <select
+                        value={selectedSectionId}
+                        onChange={(e) => setSelectedSectionId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Choose a section...</option>
+                        {formData.sections.map((section) => (
+                          <option key={section.id} value={section.id}>
+                            {section.name} ({section.subject})
+                          </option>
                         ))}
-                      </div>
+                      </select>
                     </div>
+
+                    {selectedSectionId && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Available Questions */}
+                        <div>
+                          <h4 className="text-md font-medium text-gray-900 mb-4">
+                            Available Questions for {formData.sections.find(s => s.id === selectedSectionId)?.name}
+                          </h4>
+                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {filteredQuestions.map((question) => (
+                              <div
+                                key={question.id}
+                                className="border border-gray-200 rounded-lg p-3 hover:border-blue-300 cursor-pointer"
+                                onClick={() => addQuestionToSection(selectedSectionId, question)}
+                              >
+                                <div className="text-sm font-medium text-gray-900 mb-1">
+                                  {question.questionText.substring(0, 100)}...
+                                </div>
+                                <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                  <span className={`px-2 py-1 rounded-full ${
+                                    question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                                    question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {question.difficulty}
+                                  </span>
+                                  <span>{question.subject}</span>
+                                  <span>{question.marks} marks</span>
+                                </div>
+                              </div>
+                            ))}
+                            {filteredQuestions.length === 0 && (
+                              <p className="text-sm text-gray-500">
+                                No questions available for {formData.sections.find(s => s.id === selectedSectionId)?.subject}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Selected Questions by Section */}
                     <div>

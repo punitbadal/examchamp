@@ -22,8 +22,8 @@ services:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
   # Redis for caching and sessions (Optional)
   redis:
@@ -42,7 +42,7 @@ services:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
 
   # Backend API
   backend:
@@ -89,8 +89,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
   # Frontend Application
   frontend:
@@ -123,8 +123,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
   # Nginx Reverse Proxy
   nginx:
@@ -147,7 +147,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
 
   # Monitoring with Prometheus (Optional)
   prometheus:

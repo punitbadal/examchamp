@@ -9,7 +9,10 @@ import {
   PlusIcon,
   XMarkIcon,
   CheckIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ArrowDownTrayIcon,
+  CloudArrowUpIcon,
+  DocumentDuplicateIcon
 } from '@heroicons/react/24/outline';
 
 interface CreatePracticeTestFormProps {
@@ -26,6 +29,25 @@ interface Question {
   correctAnswer: string | string[];
   marks: number;
   explanation?: string;
+}
+
+interface CSVQuestion {
+  QuestionNumber: string;
+  QuestionText: string;
+  QuestionType: string;
+  Option1?: string;
+  Option2?: string;
+  Option3?: string;
+  Option4?: string;
+  CorrectAnswer: string;
+  MarksPerQuestion: string;
+  NegativeMarksPerQuestion: string;
+  SectionId: string;
+  Difficulty: string;
+  Topic: string;
+  Subject: string;
+  Explanation: string;
+  Tags: string;
 }
 
 export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: CreatePracticeTestFormProps) {
@@ -72,6 +94,13 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
   });
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // CSV Import states
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvQuestions, setCsvQuestions] = useState<Question[]>([]);
+  const [csvImportStatus, setCsvImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [csvError, setCsvError] = useState<string>('');
+  const [showCsvPreview, setShowCsvPreview] = useState(false);
 
   const questionTypes = [
     { value: 'MCQ_Single', label: 'Single Choice MCQ' },
@@ -104,12 +133,18 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
         }
       }));
     } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
     }
   };
 
   const handleQuestionChange = (field: string, value: any) => {
-    setCurrentQuestion(prev => ({ ...prev, [field]: value }));
+    setCurrentQuestion(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const addQuestion = () => {
@@ -118,7 +153,7 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
       return;
     }
 
-    const newQuestion = {
+    const newQuestion: Question = {
       ...currentQuestion,
       id: Date.now().toString()
     };
@@ -138,6 +173,93 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
 
   const removeQuestion = (id: string) => {
     setQuestions(prev => prev.filter(q => q.id !== id));
+  };
+
+  // CSV Import Functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === 'text/csv') {
+      setCsvFile(file);
+      processCSVFile(file);
+    } else {
+      alert('Please select a valid CSV file');
+    }
+  };
+
+  const processCSVFile = async (file: File) => {
+    setCsvImportStatus('processing');
+    setCsvError('');
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      const parsedQuestions: Question[] = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i].trim() === '') continue;
+        
+        const values = lines[i].split(',').map(v => v.trim());
+        const row: any = {};
+        
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+
+        // Convert CSV row to Question format
+        const question: Question = {
+          id: `csv_${i}`,
+          text: row.QuestionText || '',
+          type: (row.QuestionType as Question['type']) || 'MCQ_Single',
+          options: row.QuestionType === 'MCQ_Single' || row.QuestionType === 'MCQ_Multiple' 
+            ? [row.Option1, row.Option2, row.Option3, row.Option4].filter(Boolean)
+            : undefined,
+          correctAnswer: row.CorrectAnswer || '',
+          marks: parseInt(row.MarksPerQuestion) || 4,
+          explanation: row.Explanation || ''
+        };
+
+        if (question.text && question.correctAnswer) {
+          parsedQuestions.push(question);
+        }
+      }
+
+      setCsvQuestions(parsedQuestions);
+      setCsvImportStatus('success');
+      setShowCsvPreview(true);
+    } catch (error) {
+      console.error('Error processing CSV:', error);
+      setCsvError('Error processing CSV file. Please check the format.');
+      setCsvImportStatus('error');
+    }
+  };
+
+  const importCSVQuestions = () => {
+    setQuestions(prev => [...prev, ...csvQuestions]);
+    setCsvQuestions([]);
+    setCsvFile(null);
+    setShowCsvPreview(false);
+    setCsvImportStatus('idle');
+  };
+
+  const downloadSampleCSV = () => {
+    const sampleData = `QuestionNumber,QuestionText,QuestionType,Option1,Option2,Option3,Option4,CorrectAnswer,MarksPerQuestion,NegativeMarksPerQuestion,SectionId,Difficulty,Topic,Subject,Explanation,Tags
+1,What is 2+2?,MCQ_Single,3,4,5,6,4,4,1,Math,easy,Arithmetic,Mathematics,Basic addition,math,addition
+2,Which are prime numbers?,MCQ_Multiple,2,3,4,5,"2,3,5",4,2,Math,medium,Number Theory,Mathematics,Prime numbers,math,prime
+3,Is 7 a prime number?,TrueFalse,True,False,,,True,2,1,Math,easy,Number Theory,Mathematics,Prime number check,math,prime
+4,What is the square root of 16?,Integer,,,,,4,4,1,Math,easy,Algebra,Mathematics,Square root,math,algebra
+5,What is 3.14 rounded to 2 decimal places?,Numerical,,,,,3.14,4,1,Math,easy,Geometry,Mathematics,Pi approximation,math,geometry`;
+
+    const blob = new Blob([sampleData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample-questions.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
 
   const handleSubmit = async () => {
@@ -177,7 +299,7 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
-        className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -243,103 +365,185 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Question Count
+                Description
               </label>
-              <input
-                type="number"
-                value={formData.settings.questionCount}
-                onChange={(e) => handleInputChange('settings.questionCount', parseInt(e.target.value))}
+              <textarea
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                min="1"
-                max="200"
+                placeholder="Enter test description"
               />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Time Limit (minutes)
-              </label>
-              <input
-                type="number"
-                value={formData.settings.timeLimit}
-                onChange={(e) => handleInputChange('settings.timeLimit', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                min="5"
-                max="480"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Passing Score (%)
-              </label>
-              <input
-                type="number"
-                value={formData.settings.passingScore}
-                onChange={(e) => handleInputChange('settings.passingScore', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                min="0"
-                max="100"
-              />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description *
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter test description"
-            />
           </div>
 
           {/* Questions Section */}
           <div className="border-t border-gray-200 pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Questions ({questions.length})</h3>
-              <button
-                onClick={() => setShowQuestionForm(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                <PlusIcon className="h-4 w-4" />
-                <span>Add Question</span>
-              </button>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Questions ({questions.length})</h3>
+              <div className="flex space-x-2">
+                <button
+                  onClick={downloadSampleCSV}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center"
+                >
+                  <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                  Download Sample CSV
+                </button>
+                <label className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center cursor-pointer">
+                  <CloudArrowUpIcon className="h-4 w-4 mr-2" />
+                  Import CSV
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </label>
+                <button
+                  onClick={() => setShowQuestionForm(true)}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+                >
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Add Question
+                </button>
+              </div>
             </div>
+
+            {/* CSV Import Status */}
+            {csvImportStatus === 'processing' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                  <span className="text-sm text-blue-800">Processing CSV file...</span>
+                </div>
+              </div>
+            )}
+
+            {csvImportStatus === 'error' && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-600 mr-2" />
+                  <span className="text-sm text-red-800">{csvError}</span>
+                </div>
+              </div>
+            )}
+
+            {csvImportStatus === 'success' && showCsvPreview && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <CheckIcon className="h-5 w-5 text-green-600 mr-2" />
+                    <span className="text-sm text-green-800">
+                      Successfully parsed {csvQuestions.length} questions from CSV
+                    </span>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={importCSVQuestions}
+                      className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                    >
+                      Import Questions
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCsvPreview(false);
+                        setCsvQuestions([]);
+                        setCsvImportStatus('idle');
+                      }}
+                      className="px-3 py-1 text-sm border border-green-600 text-green-600 rounded hover:bg-green-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CSV Preview */}
+            {showCsvPreview && csvQuestions.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-md font-medium text-gray-900 mb-3">CSV Preview</h4>
+                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Question</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Marks</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Answer</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {csvQuestions.slice(0, 5).map((question, index) => (
+                        <tr key={index}>
+                          <td className="px-3 py-2 text-sm text-gray-900">
+                            {question.text.substring(0, 50)}...
+                          </td>
+                          <td className="px-3 py-2 text-sm text-gray-500">{question.type}</td>
+                          <td className="px-3 py-2 text-sm text-gray-500">{question.marks}</td>
+                          <td className="px-3 py-2 text-sm text-gray-500">{question.correctAnswer}</td>
+                        </tr>
+                      ))}
+                      {csvQuestions.length > 5 && (
+                        <tr>
+                          <td colSpan={4} className="px-3 py-2 text-sm text-gray-500 text-center">
+                            ... and {csvQuestions.length - 5} more questions
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Questions List */}
-            <div className="space-y-3">
-              {questions.map((question, index) => (
-                <div key={question.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-sm font-medium text-gray-600">Q{index + 1}</span>
-                    <span className="text-sm text-gray-900">{question.text.substring(0, 50)}...</span>
-                    <span className="text-xs text-gray-500">({question.type})</span>
+            {questions.length > 0 ? (
+              <div className="space-y-3">
+                {questions.map((question, index) => (
+                  <div key={question.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-sm font-medium text-gray-500">#{index + 1}</span>
+                        <span className="text-sm text-gray-900">{question.text.substring(0, 80)}...</span>
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                          {question.type}
+                        </span>
+                        <span className="text-xs text-gray-500">{question.marks} marks</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeQuestion(question.id)}
+                      className="text-red-600 hover:text-red-800 p-1"
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                    </button>
                   </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <DocumentTextIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p>No questions added yet. Add questions manually or import from CSV.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Question Form Modal */}
+          {showQuestionForm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
+              <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900">Add Question</h3>
                   <button
-                    onClick={() => removeQuestion(question.id)}
-                    className="p-1 text-red-500 hover:text-red-700"
+                    onClick={() => setShowQuestionForm(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
                   >
-                    <XMarkIcon className="h-4 w-4" />
+                    <XMarkIcon className="h-5 w-5" />
                   </button>
                 </div>
-              ))}
-            </div>
 
-            {/* Question Form */}
-            {showQuestionForm && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
-              >
-                <h4 className="text-md font-semibold text-gray-900 mb-4">Add New Question</h4>
-                
-                <div className="space-y-4">
+                <div className="p-6 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Question Text *
@@ -349,11 +553,11 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
                       onChange={(e) => handleQuestionChange('text', e.target.value)}
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter question text"
+                      placeholder="Enter your question"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Question Type
@@ -379,14 +583,12 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
                         type="number"
                         value={currentQuestion.marks}
                         onChange={(e) => handleQuestionChange('marks', parseInt(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         min="1"
-                        max="10"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                   </div>
 
-                  {/* Options for MCQ */}
                   {(currentQuestion.type === 'MCQ_Single' || currentQuestion.type === 'MCQ_Multiple') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -426,99 +628,52 @@ export default function CreatePracticeTestForm({ isOpen, onClose, onSubmit }: Cr
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Explanation (Optional)
+                      Explanation
                     </label>
                     <textarea
                       value={currentQuestion.explanation}
                       onChange={(e) => handleQuestionChange('explanation', e.target.value)}
                       rows={2}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter explanation for the answer"
+                      placeholder="Optional explanation"
                     />
                   </div>
 
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={addQuestion}
-                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                    >
-                      <CheckIcon className="h-4 w-4" />
-                      <span>Add Question</span>
-                    </button>
+                  <div className="flex justify-end space-x-3 pt-4">
                     <button
                       onClick={() => setShowQuestionForm(false)}
-                      className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                     >
                       Cancel
                     </button>
+                    <button
+                      onClick={addQuestion}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Add Question
+                    </button>
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </div>
-
-          {/* Access Settings */}
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Access Settings</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={formData.access.isPublic}
-                  onChange={(e) => handleInputChange('access.isPublic', e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">Public Access</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={formData.access.isPremium}
-                  onChange={(e) => handleInputChange('access.isPremium', e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">Premium Content</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={formData.access.enrollmentRequired}
-                  onChange={(e) => handleInputChange('access.enrollmentRequired', e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">Enrollment Required</span>
-              </label>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <ExclamationTriangleIcon className="h-4 w-4" />
-            <span>* Required fields</span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
-            >
-              Cancel
-            </button>
+          {/* Submit Button */}
+          <div className="flex justify-end pt-6 border-t border-gray-200">
             <button
               onClick={handleSubmit}
-              disabled={loading}
-              className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              disabled={loading || questions.length === 0}
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {loading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Creating...</span>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creating...
                 </>
               ) : (
                 <>
-                  <CheckIcon className="h-4 w-4" />
-                  <span>Create Test</span>
+                  <CheckIcon className="h-4 w-4 mr-2" />
+                  Create Practice Test
                 </>
               )}
             </button>

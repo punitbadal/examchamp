@@ -212,6 +212,45 @@ export default function QuestionManagement() {
     alert(`${action} action will be performed on ${selectedQuestions.length} questions`);
   };
 
+  const handleEditQuestion = (questionId: string) => {
+    // Navigate to edit page with question ID
+    window.location.href = `/admin/questions/edit/${questionId}`;
+  };
+
+  const handleDeleteQuestion = async (questionId: string) => {
+    if (!confirm('Are you sure you want to delete this question? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/questions/${questionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        // Remove question from state
+        setQuestions(prev => prev.filter(q => q.id !== questionId));
+        alert('Question deleted successfully');
+      } else {
+        console.error('Failed to delete question');
+        alert('Failed to delete question');
+      }
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      alert('Error deleting question');
+    }
+  };
+
+  const handleViewQuestion = (questionId: string) => {
+    // Navigate to view page with question ID
+    window.location.href = `/admin/questions/view/${questionId}`;
+  };
+
   const truncateText = (text: string, maxLength: number = 100) => {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
@@ -439,13 +478,25 @@ export default function QuestionManagement() {
                 <div className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex space-x-2">
-                      <button className="text-blue-600 hover:text-blue-900 p-1">
+                      <button 
+                        onClick={() => handleViewQuestion(question.id)}
+                        className="text-blue-600 hover:text-blue-900 p-1"
+                        title="View Question"
+                      >
                         <EyeIcon className="h-4 w-4" />
                       </button>
-                      <button className="text-green-600 hover:text-green-900 p-1">
+                      <button 
+                        onClick={() => handleEditQuestion(question.id)}
+                        className="text-green-600 hover:text-green-900 p-1"
+                        title="Edit Question"
+                      >
                         <PencilIcon className="h-4 w-4" />
                       </button>
-                      <button className="text-red-600 hover:text-red-900 p-1">
+                      <button 
+                        onClick={() => handleDeleteQuestion(question.id)}
+                        className="text-red-600 hover:text-red-900 p-1"
+                        title="Delete Question"
+                      >
                         <TrashIcon className="h-4 w-4" />
                       </button>
                     </div>
@@ -540,13 +591,25 @@ export default function QuestionManagement() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900">
+                          <button 
+                            onClick={() => handleViewQuestion(question.id)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View Question"
+                          >
                             <EyeIcon className="h-4 w-4" />
                           </button>
-                          <button className="text-green-600 hover:text-green-900">
+                          <button 
+                            onClick={() => handleEditQuestion(question.id)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Edit Question"
+                          >
                             <PencilIcon className="h-4 w-4" />
                           </button>
-                          <button className="text-red-600 hover:text-red-900">
+                          <button 
+                            onClick={() => handleDeleteQuestion(question.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete Question"
+                          >
                             <TrashIcon className="h-4 w-4" />
                           </button>
                         </div>

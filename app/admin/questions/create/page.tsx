@@ -13,6 +13,29 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+interface Subject {
+  _id: string;
+  name: string;
+  code: string;
+  category: string;
+}
+
+interface Chapter {
+  _id: string;
+  name: string;
+  code: string;
+  chapterNumber: number;
+  subjectId: string;
+}
+
+interface Topic {
+  _id: string;
+  name: string;
+  code: string;
+  topicNumber: number;
+  chapterId: string;
+}
+
 interface QuestionForm {
   questionText: string;
   questionType: 'mcq' | 'numerical' | 'matrix_match' | 'assertion_reason';
@@ -60,6 +83,9 @@ export default function CreateQuestion() {
     tags: [],
     isActive: true
   });
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [newTag, setNewTag] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -81,11 +107,68 @@ export default function CreateQuestion() {
         router.push('/dashboard');
         return;
       }
+      
+      loadSubjects();
     } catch (error) {
       console.error('Error parsing user data:', error);
       router.push('/');
     }
   }, [router]);
+
+  const loadSubjects = async () => {
+    try {
+      // Mock data - in real app, fetch from API
+      const mockSubjects: Subject[] = [
+        { _id: '1', name: 'Physics', code: 'PHY', category: 'Science' },
+        { _id: '2', name: 'Chemistry', code: 'CHEM', category: 'Science' },
+        { _id: '3', name: 'Mathematics', code: 'MATH', category: 'Science' },
+        { _id: '4', name: 'Biology', code: 'BIO', category: 'Science' },
+        { _id: '5', name: 'English', code: 'ENG', category: 'Language' },
+        { _id: '6', name: 'Computer Science', code: 'CS', category: 'Technology' }
+      ];
+      setSubjects(mockSubjects);
+    } catch (error) {
+      console.error('Error loading subjects:', error);
+    }
+  };
+
+  const loadChapters = async (subjectId: string) => {
+    try {
+      // Mock data - in real app, fetch from API based on subjectId
+      const mockChapters: Chapter[] = [
+        { _id: '1', name: 'Mechanics', code: 'MECH', chapterNumber: 1, subjectId: '1' },
+        { _id: '2', name: 'Thermodynamics', code: 'THERMO', chapterNumber: 2, subjectId: '1' },
+        { _id: '3', name: 'Electromagnetism', code: 'EM', chapterNumber: 3, subjectId: '1' },
+        { _id: '4', name: 'Organic Chemistry', code: 'ORG', chapterNumber: 1, subjectId: '2' },
+        { _id: '5', name: 'Inorganic Chemistry', code: 'INORG', chapterNumber: 2, subjectId: '2' },
+        { _id: '6', name: 'Calculus', code: 'CALC', chapterNumber: 1, subjectId: '3' },
+        { _id: '7', name: 'Algebra', code: 'ALG', chapterNumber: 2, subjectId: '3' }
+      ];
+      const filteredChapters = mockChapters.filter(chapter => chapter.subjectId === subjectId);
+      setChapters(filteredChapters);
+    } catch (error) {
+      console.error('Error loading chapters:', error);
+    }
+  };
+
+  const loadTopics = async (chapterId: string) => {
+    try {
+      // Mock data - in real app, fetch from API based on chapterId
+      const mockTopics: Topic[] = [
+        { _id: '1', name: 'Newton\'s Laws', code: 'NEWTON', topicNumber: 1, chapterId: '1' },
+        { _id: '2', name: 'Work and Energy', code: 'WORK', topicNumber: 2, chapterId: '1' },
+        { _id: '3', name: 'Momentum', code: 'MOMENTUM', topicNumber: 3, chapterId: '1' },
+        { _id: '4', name: 'First Law', code: 'FIRST', topicNumber: 1, chapterId: '2' },
+        { _id: '5', name: 'Second Law', code: 'SECOND', topicNumber: 2, chapterId: '2' },
+        { _id: '6', name: 'Integration', code: 'INT', topicNumber: 1, chapterId: '6' },
+        { _id: '7', name: 'Differentiation', code: 'DIFF', topicNumber: 2, chapterId: '6' }
+      ];
+      const filteredTopics = mockTopics.filter(topic => topic.chapterId === chapterId);
+      setTopics(filteredTopics);
+    } catch (error) {
+      console.error('Error loading topics:', error);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -95,6 +178,29 @@ export default function CreateQuestion() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+
+    // Handle hierarchy changes
+    if (name === 'subject') {
+      setFormData(prev => ({
+        ...prev,
+        chapter: '',
+        topic: ''
+      }));
+      setChapters([]);
+      setTopics([]);
+      if (value) {
+        loadChapters(value);
+      }
+    } else if (name === 'chapter') {
+      setFormData(prev => ({
+        ...prev,
+        topic: ''
+      }));
+      setTopics([]);
+      if (value) {
+        loadTopics(value);
+      }
+    }
 
     // Clear error when user starts typing
     if (errors[name as keyof QuestionFormErrors]) {
@@ -535,10 +641,11 @@ export default function CreateQuestion() {
                     }`}
                   >
                     <option value="">Select Subject</option>
-                    <option value="Physics">Physics</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Biology">Biology</option>
+                    {subjects.map((subject) => (
+                      <option key={subject._id} value={subject._id}>
+                        {subject.name}
+                      </option>
+                    ))}
                   </select>
                   {errors.subject && (
                     <p className="mt-1 text-sm text-red-600">{errors.subject}</p>
@@ -549,16 +656,22 @@ export default function CreateQuestion() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Chapter *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="chapter"
                     value={formData.chapter}
                     onChange={handleInputChange}
-                    placeholder="e.g., Kinematics, Calculus"
                     className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
                       errors.chapter ? 'border-red-300' : 'border-gray-300'
                     }`}
-                  />
+                    disabled={!formData.subject}
+                  >
+                    <option value="">{formData.subject ? 'Select Chapter' : 'Select Subject First'}</option>
+                    {chapters.map((chapter) => (
+                      <option key={chapter._id} value={chapter._id}>
+                        {chapter.name}
+                      </option>
+                    ))}
+                  </select>
                   {errors.chapter && (
                     <p className="mt-1 text-sm text-red-600">{errors.chapter}</p>
                   )}
@@ -568,16 +681,22 @@ export default function CreateQuestion() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Topic *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="topic"
                     value={formData.topic}
                     onChange={handleInputChange}
-                    placeholder="e.g., Motion in One Dimension"
                     className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
                       errors.topic ? 'border-red-300' : 'border-gray-300'
                     }`}
-                  />
+                    disabled={!formData.chapter}
+                  >
+                    <option value="">{formData.chapter ? 'Select Topic' : 'Select Chapter First'}</option>
+                    {topics.map((topic) => (
+                      <option key={topic._id} value={topic._id}>
+                        {topic.name}
+                      </option>
+                    ))}
+                  </select>
                   {errors.topic && (
                     <p className="mt-1 text-sm text-red-600">{errors.topic}</p>
                   )}

@@ -43,6 +43,11 @@ const questionSchema = new mongoose.Schema({
     trim: true,
     index: true
   },
+  chapter: {
+    type: String,
+    trim: true,
+    index: true
+  },
   topic: {
     type: String,
     trim: true,
@@ -106,7 +111,7 @@ const questionSchema = new mongoose.Schema({
 });
 
 // Indexes for better performance
-questionSchema.index({ subject: 1, topic: 1, difficulty: 1 });
+questionSchema.index({ subject: 1, chapter: 1, topic: 1, difficulty: 1 });
 questionSchema.index({ questionType: 1, isActive: 1 });
 questionSchema.index({ createdBy: 1, createdAt: -1 });
 

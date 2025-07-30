@@ -84,6 +84,17 @@ export default function ContentLibrary() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'rating'>('recent');
   const [showFilters, setShowFilters] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    title: '',
+    type: 'pdf' as 'pdf' | 'video' | 'article' | 'presentation' | 'formula_sheet' | 'notes' | 'previous_papers',
+    category: '',
+    subject: '',
+    description: '',
+    isPremium: false,
+    file: null as File | null
+  });
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     loadContent();
@@ -258,6 +269,83 @@ export default function ContentLibrary() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadForm(prev => ({ ...prev, file }));
+    }
+  };
+
+  const handleUploadFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    
+    setUploadForm(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!uploadForm.file) {
+      toast.error('Please select a file to upload');
+      return;
+    }
+
+    if (!uploadForm.title || !uploadForm.subject || !uploadForm.category) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      
+      formData.append('file', uploadForm.file);
+      formData.append('title', uploadForm.title);
+      formData.append('type', uploadForm.type);
+      formData.append('category', uploadForm.category);
+      formData.append('subject', uploadForm.subject);
+      formData.append('description', uploadForm.description);
+      formData.append('isPremium', uploadForm.isPremium.toString());
+
+      const response = await fetch('/api/study-materials/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        toast.success('Content uploaded successfully!');
+        setShowUploadModal(false);
+        setUploadForm({
+          title: '',
+          type: 'pdf',
+          category: '',
+          subject: '',
+          description: '',
+          isPremium: false,
+          file: null
+        });
+        loadContent(); // Reload content
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to upload content');
+      }
+    } catch (error) {
+      console.error('Error uploading content:', error);
+      toast.error('Error uploading content');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const filteredMaterials = materials.filter(material => {
     const matchesSubject = selectedSubject === 'all' || material.subject === selectedSubject;
     const matchesCategory = selectedCategory === 'all' || material.category === selectedCategory;
@@ -294,6 +382,13 @@ export default function ContentLibrary() {
           >
             <FunnelIcon className="h-4 w-4" />
             <span>Filters</span>
+          </button>
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <FolderPlusIcon className="h-4 w-4" />
+            <span>Upload Content</span>
           </button>
         </div>
       </div>
@@ -567,6 +662,146 @@ export default function ContentLibrary() {
         {activeTab === 'materials' && renderMaterials()}
         {activeTab === 'tests' && renderPracticeTests()}
       </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Upload Study Material</h3>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpload} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  name="title"
+                  value={uploadForm.title}
+                  onChange={handleUploadFormChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter material title"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                <select
+                  name="type"
+                  value={uploadForm.type}
+                  onChange={handleUploadFormChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="pdf">PDF Document</option>
+                  <option value="video">Video</option>
+                  <option value="article">Article</option>
+                  <option value="presentation">Presentation</option>
+                  <option value="formula_sheet">Formula Sheet</option>
+                  <option value="notes">Study Notes</option>
+                  <option value="previous_papers">Previous Papers</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subject *</label>
+                <select
+                  name="subject"
+                  value={uploadForm.subject}
+                  onChange={handleUploadFormChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="">Select Subject</option>
+                  {subjects.map(subject => (
+                    <option key={subject.id} value={subject.name}>{subject.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                <select
+                  name="category"
+                  value={uploadForm.category}
+                  onChange={handleUploadFormChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="">Select Category</option>
+                  <option value="Formula Sheets">Formula Sheets</option>
+                  <option value="Video Lectures">Video Lectures</option>
+                  <option value="Study Notes">Study Notes</option>
+                  <option value="Previous Papers">Previous Papers</option>
+                  <option value="Practice Questions">Practice Questions</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  name="description"
+                  value={uploadForm.description}
+                  onChange={handleUploadFormChange}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter material description"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">File *</label>
+                <input
+                  type="file"
+                  onChange={handleFileChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  accept=".pdf,.doc,.docx,.mp4,.avi,.mov,.ppt,.pptx,.txt"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  name="isPremium"
+                  checked={uploadForm.isPremium}
+                  onChange={handleUploadFormChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label className="ml-2 block text-sm text-gray-900">
+                  Premium Content (Only for subscribed users)
+                </label>
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

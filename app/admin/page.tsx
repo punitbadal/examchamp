@@ -273,6 +273,33 @@ export default function AdminDashboard() {
             </div>
           </motion.div>
 
+          {/* Subject/Chapter/Topic Management */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.075 }}
+            className="bg-white rounded-lg shadow-sm border p-6"
+          >
+            <div className="flex items-center mb-4">
+              <AcademicCapIcon className="h-8 w-8 text-teal-600 mr-3" />
+              <h2 className="text-xl font-semibold text-gray-900">Curriculum Management</h2>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Organize subjects, chapters, and topics for structured learning.
+            </p>
+            <div className="space-y-2">
+              <Link href="/admin/subjects" className="block w-full text-left px-4 py-2 text-sm text-teal-600 hover:bg-teal-50 rounded-md">
+                Manage Subjects
+              </Link>
+              <Link href="/admin/chapters" className="block w-full text-left px-4 py-2 text-sm text-teal-600 hover:bg-teal-50 rounded-md">
+                Manage Chapters
+              </Link>
+              <Link href="/admin/topics" className="block w-full text-left px-4 py-2 text-sm text-teal-600 hover:bg-teal-50 rounded-md">
+                Manage Topics
+              </Link>
+            </div>
+          </motion.div>
+
           {/* Exam Management */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}

@@ -51,16 +51,56 @@ export default function AnalyticsPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/analytics', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      
+      // Fetch real analytics data from multiple endpoints
+      const [analyticsResponse, examsResponse, usersResponse, resultsResponse] = await Promise.all([
+        fetch('/api/analytics', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch('/api/exams', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch('/api/users', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch('/api/results', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ]);
 
-      if (response.ok) {
-        const data = await response.json();
-        setAnalyticsData(data);
+      if (analyticsResponse.ok && examsResponse.ok && usersResponse.ok && resultsResponse.ok) {
+        const [analyticsData, examsData, usersData, resultsData] = await Promise.all([
+          analyticsResponse.json(),
+          examsResponse.json(),
+          usersResponse.json(),
+          resultsResponse.json()
+        ]);
+
+        // Process real data
+        const processedData: AnalyticsData = {
+          totalExams: examsData.data?.docs?.length || 0,
+          totalUsers: usersData.data?.docs?.length || 0,
+          totalAttempts: resultsData.data?.docs?.length || 0,
+          averageScore: analyticsData.averageScore || 0,
+          passRate: analyticsData.passRate || 0,
+          recentExams: analyticsData.recentExams || [],
+          topPerformers: analyticsData.topPerformers || [],
+          subjectPerformance: analyticsData.subjectPerformance || []
+        };
+
+        setAnalyticsData(processedData);
       } else {
         console.error('Failed to fetch analytics data');
         // Fallback to mock data if API fails

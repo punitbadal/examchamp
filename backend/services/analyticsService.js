@@ -644,6 +644,212 @@ class AnalyticsService {
   clearCache() {
     this.cache.clear();
   }
+
+  // Get overview statistics
+  async getOverviewStats() {
+    const cacheKey = 'overview_stats';
+    const cached = this.getCachedData(cacheKey);
+    if (cached) return cached;
+
+    const stats = {
+      totalExams: await Exam.countDocuments(),
+      totalUsers: await User.countDocuments(),
+      totalAttempts: await ExamAttempt.countDocuments(),
+      averageScore: 0,
+      passRate: 0,
+      recentExams: [],
+      topPerformers: [],
+      subjectPerformance: []
+    };
+
+    // Calculate average score and pass rate
+    const completedAttempts = await ExamAttempt.find({ status: 'completed' });
+    if (completedAttempts.length > 0) {
+      const totalScore = completedAttempts.reduce((sum, attempt) => sum + (attempt.percentage || 0), 0);
+      stats.averageScore = totalScore / completedAttempts.length;
+      
+      const passingAttempts = completedAttempts.filter(attempt => 
+        attempt.percentage >= (attempt.passingScore || 40)
+      ).length;
+      stats.passRate = (passingAttempts / completedAttempts.length) * 100;
+    }
+
+    // Get recent exams
+    const recentExams = await Exam.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('createdBy', 'firstName lastName');
+
+    stats.recentExams = recentExams.map(exam => ({
+      id: exam._id,
+      title: exam.title,
+      attempts: exam.analytics?.totalAttempts || 0,
+      avgScore: exam.analytics?.averageScore || 0,
+      status: exam.status
+    }));
+
+    // Get top performers
+    const topPerformers = await ExamAttempt.find({ status: 'completed' })
+      .sort({ percentage: -1 })
+      .limit(10)
+      .populate('studentId', 'firstName lastName email')
+      .populate('examId', 'title');
+
+    stats.topPerformers = topPerformers.map(attempt => ({
+      id: attempt.studentId._id,
+      name: `${attempt.studentId.firstName} ${attempt.studentId.lastName}`,
+      score: attempt.percentage,
+      exam: attempt.examId.title
+    }));
+
+    // Get subject performance
+    const subjectStats = {};
+    completedAttempts.forEach(attempt => {
+      if (attempt.sectionPerformance) {
+        attempt.sectionPerformance.forEach(section => {
+          const subject = section.sectionName.split(' ')[0];
+          if (!subjectStats[subject]) {
+            subjectStats[subject] = { totalScore: 0, count: 0, totalQuestions: 0 };
+          }
+          subjectStats[subject].totalScore += section.sectionPercentage;
+          subjectStats[subject].count++;
+          subjectStats[subject].totalQuestions += section.totalQuestions || 0;
+        });
+      }
+    });
+
+    stats.subjectPerformance = Object.keys(subjectStats).map(subject => ({
+      subject,
+      avgScore: subjectStats[subject].totalScore / subjectStats[subject].count,
+      totalQuestions: subjectStats[subject].totalQuestions
+    }));
+
+    this.setCachedData(cacheKey, stats);
+    return stats;
+  }
+
+  // Get dashboard data
+  async getDashboardData() {
+    const cacheKey = 'dashboard_data';
+    const cached = this.getCachedData(cacheKey);
+    if (cached) return cached;
+
+    const data = {
+      overview: await this.getOverviewStats(),
+      recentActivity: [],
+      alerts: [],
+      trends: {}
+    };
+
+    // Get recent activity
+    const recentAttempts = await ExamAttempt.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('studentId', 'firstName lastName')
+      .populate('examId', 'title');
+
+    data.recentActivity = recentAttempts.map(attempt => ({
+      type: 'exam_attempt',
+      student: `${attempt.studentId.firstName} ${attempt.studentId.lastName}`,
+      exam: attempt.examId.title,
+      score: attempt.percentage,
+      timestamp: attempt.createdAt
+    }));
+
+    // Get alerts
+    const flaggedAttempts = await ExamAttempt.find({
+      'proctoring.finalProctoringStatus': 'flagged'
+    }).count();
+
+    if (flaggedAttempts > 0) {
+      data.alerts.push({
+        type: 'proctoring_violation',
+        message: `${flaggedAttempts} proctoring violations detected`,
+        severity: 'medium'
+      });
+    }
+
+    this.setCachedData(cacheKey, data);
+    return data;
+  }
+
+  // Get analytics insights
+  async getAnalyticsInsights(examId) {
+    const examAnalytics = await this.getExamAnalytics(examId);
+    
+    const insights = {
+      examId,
+      keyInsights: [],
+      recommendations: [],
+      trends: examAnalytics.trends
+    };
+
+    // Generate key insights
+    if (examAnalytics.passRate < 70) {
+      insights.keyInsights.push({
+        type: 'warning',
+        message: 'Low pass rate detected. Consider reviewing exam difficulty.',
+        metric: 'passRate',
+        value: examAnalytics.passRate
+      });
+    }
+
+    if (examAnalytics.proctoringStats.flaggedSessions > examAnalytics.totalAttempts * 0.1) {
+      insights.keyInsights.push({
+        type: 'alert',
+        message: 'High number of proctoring violations. Review security settings.',
+        metric: 'proctoringViolations',
+        value: examAnalytics.proctoringStats.flaggedSessions
+      });
+    }
+
+    if (examAnalytics.averageScore > 85) {
+      insights.keyInsights.push({
+        type: 'success',
+        message: 'Excellent average performance. Consider increasing difficulty.',
+        metric: 'averageScore',
+        value: examAnalytics.averageScore
+      });
+    }
+
+    return insights;
+  }
+
+  // Get analytics recommendations
+  async getAnalyticsRecommendations(examId) {
+    const examAnalytics = await this.getExamAnalytics(examId);
+    
+    const recommendations = [];
+
+    if (examAnalytics.passRate < 70) {
+      recommendations.push({
+        type: 'difficulty',
+        priority: 'high',
+        message: 'Consider reducing exam difficulty or providing additional study materials',
+        action: 'review_exam_content'
+      });
+    }
+
+    if (examAnalytics.proctoringStats.flaggedSessions > examAnalytics.totalAttempts * 0.1) {
+      recommendations.push({
+        type: 'security',
+        priority: 'medium',
+        message: 'Review proctoring settings to reduce false positives',
+        action: 'adjust_proctoring_settings'
+      });
+    }
+
+    if (examAnalytics.averageTime > examAnalytics.totalDuration * 0.8) {
+      recommendations.push({
+        type: 'timing',
+        priority: 'low',
+        message: 'Consider extending exam duration or reducing question count',
+        action: 'review_exam_timing'
+      });
+    }
+
+    return recommendations;
+  }
 }
 
 module.exports = new AnalyticsService(); 

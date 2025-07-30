@@ -17,8 +17,26 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
+interface Exam {
+  _id: string;
+  title: string;
+  examCode: string;
+  description: string;
+  duration: number;
+  totalMarks: number;
+  examType: 'live' | 'practice' | 'mock';
+  maxAttempts: number;
+  passingScore: number;
+  isActive: boolean;
+  proctoringEnabled: boolean;
+  sections: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ExamSchedule {
   id: string;
+  examId: string;
   title: string;
   examCode: string;
   startDate: Date;
@@ -32,16 +50,28 @@ interface ExamSchedule {
   proctoringEnabled: boolean;
   instructions: string;
   subjects: string[];
+  maxParticipants?: number;
+  allowedUsers?: string[];
 }
 
 export default function ExamSchedulePage() {
   const [schedules, setSchedules] = useState<ExamSchedule[]>([]);
+  const [availableExams, setAvailableExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<ExamSchedule | null>(null);
+  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    startTime: '',
+    endTime: '',
+    maxParticipants: '',
+    proctoringEnabled: 'true',
+    instructions: ''
+  });
 
   useEffect(() => {
     fetchSchedules();
+    fetchAvailableExams();
   }, []);
 
   const fetchSchedules = async () => {
@@ -51,6 +81,7 @@ export default function ExamSchedulePage() {
       const mockSchedules: ExamSchedule[] = [
         {
           id: '1',
+          examId: 'exam1',
           title: 'JEE Main Mock Test 1',
           examCode: 'JEE001',
           startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
@@ -67,6 +98,7 @@ export default function ExamSchedulePage() {
         },
         {
           id: '2',
+          examId: 'exam2',
           title: 'NEET Practice Test',
           examCode: 'NEET001',
           startDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
@@ -83,6 +115,7 @@ export default function ExamSchedulePage() {
         },
         {
           id: '3',
+          examId: 'exam3',
           title: 'GATE Computer Science',
           examCode: 'GATE001',
           startDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
@@ -103,6 +136,65 @@ export default function ExamSchedulePage() {
       console.error('Error fetching schedules:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAvailableExams = async () => {
+    try {
+      // Mock data - in real app, fetch from API
+      const mockExams: Exam[] = [
+        {
+          _id: 'exam1',
+          title: 'JEE Main Mock Test 1',
+          examCode: 'JEE001',
+          description: 'Comprehensive mock test for JEE Main preparation',
+          duration: 180,
+          totalMarks: 300,
+          examType: 'mock',
+          maxAttempts: 1,
+          passingScore: 120,
+          isActive: true,
+          proctoringEnabled: true,
+          sections: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          _id: 'exam2',
+          title: 'NEET Practice Test',
+          examCode: 'NEET001',
+          description: 'Practice test for NEET preparation',
+          duration: 200,
+          totalMarks: 720,
+          examType: 'practice',
+          maxAttempts: 3,
+          passingScore: 288,
+          isActive: true,
+          proctoringEnabled: false,
+          sections: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          _id: 'exam3',
+          title: 'GATE Computer Science',
+          examCode: 'GATE001',
+          description: 'GATE Computer Science practice test',
+          duration: 180,
+          totalMarks: 100,
+          examType: 'live',
+          maxAttempts: 1,
+          passingScore: 25,
+          isActive: true,
+          proctoringEnabled: true,
+          sections: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+      setAvailableExams(mockExams);
+    } catch (error) {
+      console.error('Error fetching available exams:', error);
     }
   };
 
@@ -132,16 +224,53 @@ export default function ExamSchedulePage() {
     return `${hours}h ${mins}m`;
   };
 
+  const calculateEndTime = (startTime: string, durationMinutes: number) => {
+    if (!startTime) return '';
+    
+    const startDate = new Date(startTime);
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+    
+    // Format to datetime-local format (YYYY-MM-DDTHH:MM)
+    const year = endDate.getFullYear();
+    const month = String(endDate.getMonth() + 1).padStart(2, '0');
+    const day = String(endDate.getDate()).padStart(2, '0');
+    const hours = String(endDate.getHours()).padStart(2, '0');
+    const minutes = String(endDate.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const handleScheduleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    
+    setScheduleForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Auto-calculate end time when start time changes
+    if (name === 'startTime' && selectedExam) {
+      const endTime = calculateEndTime(value, selectedExam.duration);
+      setScheduleForm(prev => ({
+        ...prev,
+        endTime
+      }));
+    }
+  };
+
   const renderScheduleList = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Exam Schedules</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Exam Schedules</h2>
+          <p className="text-gray-600 mt-1">Schedule existing exams for specific dates and manage participant access</p>
+        </div>
         <button 
           onClick={() => setShowCreateForm(true)}
           className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
           <PlusIcon className="w-4 h-4" />
-          <span>Schedule Exam</span>
+          <span>Schedule New Exam</span>
         </button>
       </div>
 
@@ -229,7 +358,7 @@ export default function ExamSchedulePage() {
   const renderCreateForm = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Schedule New Exam</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Schedule Existing Exam</h2>
         <button 
           onClick={() => setShowCreateForm(false)}
           className="text-gray-600 hover:text-gray-900"
@@ -240,149 +369,137 @@ export default function ExamSchedulePage() {
 
       <div className="bg-white rounded-lg shadow-sm border p-6">
         <form className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Exam Title
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter exam title"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Exam Code
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter exam code"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Start Date & Time
-              </label>
-              <input
-                type="datetime-local"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                End Date & Time
-              </label>
-              <input
-                type="datetime-local"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Duration (minutes)
-              </label>
-              <input
-                type="number"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="180"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Max Attempts
-              </label>
-              <input
-                type="number"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="3"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Total Marks
-              </label>
-              <input
-                type="number"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="300"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Pass Marks
-              </label>
-              <input
-                type="number"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="120"
-              />
-            </div>
-          </div>
-
+          {/* Exam Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Instructions
+              Select Exam to Schedule *
             </label>
-            <textarea
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter exam instructions..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Subjects
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English'].map((subject) => (
-                <label key={subject} className="flex items-center space-x-2">
-                  <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  <span className="text-sm text-gray-700">{subject}</span>
-                </label>
+            <select
+              value={selectedExam?._id || ''}
+              onChange={(e) => {
+                const exam = availableExams.find(ex => ex._id === e.target.value);
+                setSelectedExam(exam || null);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Choose an exam to make live</option>
+              {availableExams.map((exam) => (
+                <option key={exam._id} value={exam._id}>
+                  {exam.title} ({exam.examCode}) - {exam.examType}
+                </option>
               ))}
-            </div>
+            </select>
+            {selectedExam && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                <h4 className="font-medium text-blue-900">{selectedExam.title}</h4>
+                <p className="text-sm text-blue-700">{selectedExam.description}</p>
+                <div className="mt-2 text-xs text-blue-600">
+                  Duration: {formatDuration(selectedExam.duration)} | 
+                  Marks: {selectedExam.totalMarks} | 
+                  Type: {selectedExam.examType}
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-2">
-              <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" defaultChecked />
-              <span className="text-sm text-gray-700">Enable Proctoring</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              <span className="text-sm text-gray-700">Randomize Questions</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              <span className="text-sm text-gray-700">Show Results Immediately</span>
-            </label>
-          </div>
+          {selectedExam && (
+            <>
+              {/* Schedule Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date & Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="startTime"
+                    value={scheduleForm.startTime}
+                    onChange={handleScheduleFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
 
-          <div className="flex items-center space-x-4 pt-4 border-t border-gray-200">
-            <button
-              type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Schedule Exam
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCreateForm(false)}
-              className="px-6 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
-            >
-              Cancel
-            </button>
-          </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date & Time * (Auto-calculated)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="endTime"
+                    value={scheduleForm.endTime}
+                    onChange={handleScheduleFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              {/* Participant Settings */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Max Participants
+                  </label>
+                  <input
+                    type="number"
+                    name="maxParticipants"
+                    value={scheduleForm.maxParticipants}
+                    onChange={handleScheduleFormChange}
+                    min="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Unlimited"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Proctoring Enabled
+                  </label>
+                  <select 
+                    name="proctoringEnabled"
+                    value={scheduleForm.proctoringEnabled}
+                    onChange={handleScheduleFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Additional Instructions
+                </label>
+                <textarea
+                  name="instructions"
+                  value={scheduleForm.instructions}
+                  onChange={handleScheduleFormChange}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter any additional instructions for participants..."
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Create Schedule
+                </button>
+              </div>
+            </>
+          )}
         </form>
       </div>
     </div>
@@ -501,7 +618,7 @@ export default function ExamSchedulePage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <CalendarIcon className="h-8 w-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Exam Scheduling</span>
+              <span className="ml-2 text-xl font-bold text-gray-900">Schedule Existing Exams</span>
             </div>
             <Link href="/admin" className="text-gray-600 hover:text-gray-900">
               ← Back to Admin
