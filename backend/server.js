@@ -153,6 +153,7 @@ app.use('/api/subjects', require('./routes/subjects'));
 app.use('/api/categories', require('./routes/categories'));
 app.use('/api/chapters', require('./routes/chapters'));
 app.use('/api/topics', require('./routes/topics'));
+app.use('/api/bulk-import', require('./routes/bulk-import'));
 // app.use('/api/proctoring', require('./routes/proctoring'));
 // app.use('/api/courses', require('./routes/courses'));
 // app.use('/api/practice-tests', require('./routes/practice-tests'));

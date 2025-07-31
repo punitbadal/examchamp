@@ -297,6 +297,9 @@ export default function AdminDashboard() {
               <Link href="/admin/topics" className="block w-full text-left px-4 py-2 text-sm text-teal-600 hover:bg-teal-50 rounded-md">
                 Manage Topics
               </Link>
+              <Link href="/admin/bulk-import" className="block w-full text-left px-4 py-2 text-sm text-teal-600 hover:bg-teal-50 rounded-md">
+                Bulk Import Content
+              </Link>
             </div>
           </motion.div>
 

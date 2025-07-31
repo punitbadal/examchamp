@@ -11,6 +11,8 @@ import {
   ChartBarIcon,
   BookOpenIcon
 } from '@heroicons/react/24/outline';
+import RichTextEditor from '../../components/RichTextEditor';
+import RichTextRenderer from '../../components/RichTextRenderer';
 
 interface Chapter {
   _id: string;
@@ -88,6 +90,19 @@ const CreateChapterModal: React.FC<CreateChapterModalProps> = ({
     learningObjectives: chapter?.learningObjectives || [],
     prerequisites: chapter?.prerequisites || []
   });
+
+  // Auto-populate chapter code when subject changes
+  useEffect(() => {
+    if (formData.subjectId && !chapter) { // Only auto-populate for new chapters
+      const selectedSubject = subjects.find(subject => subject._id === formData.subjectId);
+      if (selectedSubject) {
+        setFormData(prev => ({
+          ...prev,
+          code: `${selectedSubject.code}-`
+        }));
+      }
+    }
+  }, [formData.subjectId, subjects, chapter]);
 
   const [objectiveInput, setObjectiveInput] = useState('');
   const [prerequisiteInput, setPrerequisiteInput] = useState('');
@@ -235,11 +250,11 @@ const CreateChapterModal: React.FC<CreateChapterModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Description
             </label>
-            <textarea
+            <RichTextEditor
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+              placeholder="Enter chapter description with formatting, bullet points, and mathematical equations..."
+              className="w-full"
             />
           </div>
 
@@ -293,12 +308,11 @@ const CreateChapterModal: React.FC<CreateChapterModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Syllabus
             </label>
-            <textarea
+            <RichTextEditor
               value={formData.syllabus}
-              onChange={(e) => setFormData(prev => ({ ...prev, syllabus: e.target.value }))}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter chapter syllabus..."
+              onChange={(value) => setFormData(prev => ({ ...prev, syllabus: value }))}
+              placeholder="Enter chapter syllabus with formatting, bullet points, and mathematical equations..."
+              className="w-full"
             />
           </div>
 
@@ -548,18 +562,31 @@ export default function ChaptersPage() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Chapters Management</h1>
-          <p className="text-gray-600">Manage chapters within subjects</p>
+      {/* Header with Navigation */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-4">
+            <a
+              href="/admin"
+              className="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Dashboard
+            </a>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <h1 className="text-2xl font-bold text-gray-900">Chapters Management</h1>
+          </div>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Add Chapter
+          </button>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          <PlusIcon className="h-4 w-4 mr-2" />
-          Add Chapter
-        </button>
+        <p className="text-gray-600">Manage chapters within subjects</p>
       </div>
 
       {/* Filters */}
@@ -651,7 +678,9 @@ export default function ChaptersPage() {
                 <span className="font-medium">Subject:</span> {chapter.subjectId.name}
               </p>
               {chapter.description && (
-                <p className="text-sm text-gray-600">{chapter.description}</p>
+                <div className="text-sm text-gray-600">
+                  <RichTextRenderer content={chapter.description} />
+                </div>
               )}
             </div>
 

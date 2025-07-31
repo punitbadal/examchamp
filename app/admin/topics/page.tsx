@@ -11,6 +11,8 @@ import {
   ChartBarIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
+import RichTextEditor from '../../components/RichTextEditor';
+import RichTextRenderer from '../../components/RichTextRenderer';
 
 interface Topic {
   _id: string;
@@ -79,7 +81,12 @@ interface Chapter {
   name: string;
   code: string;
   chapterNumber: number;
-  subjectId: string;
+  subjectId: string | {
+    _id: string;
+    name: string;
+    code: string;
+    category: string;
+  };
 }
 
 interface CreateTopicModalProps {
@@ -119,14 +126,43 @@ const CreateTopicModal: React.FC<CreateTopicModalProps> = ({
     examples: topic?.examples || []
   });
 
+  // Auto-populate topic code when subject and chapter change
+  useEffect(() => {
+    if (formData.subjectId && formData.chapterId && !topic) { // Only auto-populate for new topics
+      const selectedSubject = subjects.find(subject => subject._id === formData.subjectId);
+      const selectedChapter = chapters.find(chapter => chapter._id === formData.chapterId);
+      
+      if (selectedSubject && selectedChapter) {
+        setFormData(prev => ({
+          ...prev,
+          code: `${selectedSubject.code}-${selectedChapter.code}-`
+        }));
+      }
+    }
+  }, [formData.subjectId, formData.chapterId, subjects, chapters, topic]);
+
   const [objectiveInput, setObjectiveInput] = useState('');
   const [conceptInput, setConceptInput] = useState('');
   const [formulaInput, setFormulaInput] = useState('');
   const [exampleInput, setExampleInput] = useState({ title: '', description: '', solution: '' });
 
-  const filteredChapters = chapters.filter(chapter => 
-    !formData.subjectId || chapter.subjectId === formData.subjectId
-  );
+  const filteredChapters = chapters.filter(chapter => {
+    if (!formData.subjectId) return true;
+    
+    // Handle both string and object subjectId
+    const chapterSubjectId = typeof chapter.subjectId === 'string' 
+      ? chapter.subjectId 
+      : chapter.subjectId._id;
+    
+    return chapterSubjectId === formData.subjectId;
+  });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Available chapters:', chapters);
+    console.log('Selected subjectId:', formData.subjectId);
+    console.log('Filtered chapters:', filteredChapters);
+  }, [chapters, formData.subjectId, filteredChapters]);
 
   useEffect(() => {
     if (topic) {
@@ -334,11 +370,11 @@ const CreateTopicModal: React.FC<CreateTopicModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Description
             </label>
-            <textarea
+            <RichTextEditor
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+              placeholder="Enter topic description with formatting, bullet points, and mathematical equations..."
+              className="w-full"
             />
           </div>
 
@@ -392,12 +428,11 @@ const CreateTopicModal: React.FC<CreateTopicModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Content
             </label>
-            <textarea
+            <RichTextEditor
               value={formData.content}
-              onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-              rows={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter topic content, explanations, and detailed information..."
+              onChange={(value) => setFormData(prev => ({ ...prev, content: value }))}
+              placeholder="Enter topic content, explanations, and detailed information with formatting, bullet points, and mathematical equations..."
+              className="w-full"
             />
           </div>
 
@@ -744,9 +779,16 @@ export default function TopicsPage() {
     return matchesSearch && matchesSubject && matchesChapter && matchesDifficulty;
   });
 
-  const filteredChapters = chapters.filter(chapter => 
-    !subjectFilter || chapter.subjectId === subjectFilter
-  );
+  const filteredChapters = chapters.filter(chapter => {
+    if (!subjectFilter) return true;
+    
+    // Handle both string and object subjectId
+    const chapterSubjectId = typeof chapter.subjectId === 'string' 
+      ? chapter.subjectId 
+      : chapter.subjectId._id;
+    
+    return chapterSubjectId === subjectFilter;
+  });
 
   const getDifficultyColor = (difficulty: string) => {
     const colors = {
@@ -774,18 +816,31 @@ export default function TopicsPage() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Topics Management</h1>
-          <p className="text-gray-600">Manage topics within chapters</p>
+      {/* Header with Navigation */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-4">
+            <a
+              href="/admin"
+              className="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Dashboard
+            </a>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <h1 className="text-2xl font-bold text-gray-900">Topics Management</h1>
+          </div>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Add Topic
+          </button>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          <PlusIcon className="h-4 w-4 mr-2" />
-          Add Topic
-        </button>
+        <p className="text-gray-600">Manage topics within chapters</p>
       </div>
 
       {/* Filters */}
@@ -898,7 +953,9 @@ export default function TopicsPage() {
                 <span className="font-medium">Chapter:</span> {topic.chapterName}
               </p>
               {topic.description && (
-                <p className="text-sm text-gray-600">{topic.description}</p>
+                <div className="text-sm text-gray-600">
+                  <RichTextRenderer content={topic.description} />
+                </div>
               )}
             </div>
 

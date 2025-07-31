@@ -4,19 +4,24 @@ const asyncHandler = require('express-async-handler');
 const mongoose = require('mongoose');
 const Category = require('../models/Category');
 const Subject = require('../models/Subject');
+const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
 // @route   POST /api/categories
 // @desc    Create a new category
 // @access  Private (Admin only)
-router.post('/', [
-  body('name').trim().isLength({ min: 1, max: 100 }),
-  body('description').optional().trim().isLength({ max: 500 }),
-  body('color').optional().isHexColor(),
-  body('icon').optional().trim(),
-  body('order').optional().isInt({ min: 0 })
-], asyncHandler(async (req, res) => {
+router.post('/', 
+  authenticateToken,
+  authorize('admin', 'super_admin'),
+  [
+    body('name').trim().isLength({ min: 1, max: 100 }),
+    body('description').optional().trim().isLength({ max: 500 }),
+    body('color').optional().isHexColor(),
+    body('icon').optional().trim(),
+    body('order').optional().isInt({ min: 0 })
+  ], 
+  asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -43,21 +48,21 @@ router.post('/', [
     icon,
     order,
     isActive: true,
-    createdBy: new mongoose.Types.ObjectId() // Generate a new ObjectId for now
+    createdBy: req.user._id
   });
 
   await category.save();
 
   res.status(201).json({
     message: 'Category created successfully',
-    category
+    data: category
   });
 }));
 
 // @route   GET /api/categories
 // @desc    Get all categories (with filtering)
 // @access  Private
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', authenticateToken, asyncHandler(async (req, res) => {
   const {
     page = 1,
     limit = 50,
@@ -99,12 +104,14 @@ router.get('/', asyncHandler(async (req, res) => {
   const total = await Category.countDocuments(query);
 
   res.json({
-    categories: categoriesWithCounts,
-    pagination: {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total,
-      pages: Math.ceil(total / parseInt(limit))
+    data: {
+      docs: categoriesWithCounts,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
     }
   });
 }));
@@ -112,7 +119,7 @@ router.get('/', asyncHandler(async (req, res) => {
 // @route   GET /api/categories/:id
 // @desc    Get category by ID
 // @access  Private
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get('/:id', authenticateToken, asyncHandler(async (req, res) => {
   const category = await Category.findById(req.params.id);
 
   if (!category) {
@@ -123,7 +130,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const subjectCount = await Subject.countDocuments({ category: category.name });
 
   res.json({ 
-    category: {
+    data: {
       ...category.toObject(),
       subjectCount
     }
@@ -133,14 +140,18 @@ router.get('/:id', asyncHandler(async (req, res) => {
 // @route   PUT /api/categories/:id
 // @desc    Update category
 // @access  Private (Admin only)
-router.put('/:id', [
-  body('name').optional().trim().isLength({ min: 1, max: 100 }),
-  body('description').optional().trim().isLength({ max: 500 }),
-  body('color').optional().isHexColor(),
-  body('icon').optional().trim(),
-  body('order').optional().isInt({ min: 0 }),
-  body('isActive').optional().isBoolean()
-], asyncHandler(async (req, res) => {
+router.put('/:id', 
+  authenticateToken,
+  authorize('admin', 'super_admin'),
+  [
+    body('name').optional().trim().isLength({ min: 1, max: 100 }),
+    body('description').optional().trim().isLength({ max: 500 }),
+    body('color').optional().isHexColor(),
+    body('icon').optional().trim(),
+    body('order').optional().isInt({ min: 0 }),
+    body('isActive').optional().isBoolean()
+  ], 
+  asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -168,14 +179,17 @@ router.put('/:id', [
 
   res.json({
     message: 'Category updated successfully',
-    category
+    data: category
   });
 }));
 
 // @route   DELETE /api/categories/:id
 // @desc    Delete category
 // @access  Private (Admin only)
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete('/:id', 
+  authenticateToken,
+  authorize('admin', 'super_admin'),
+  asyncHandler(async (req, res) => {
   const category = await Category.findById(req.params.id);
   if (!category) {
     return res.status(404).json({ error: 'Category not found' });
@@ -197,7 +211,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 // @route   GET /api/categories/:id/subjects
 // @desc    Get subjects by category
 // @access  Private
-router.get('/:id/subjects', asyncHandler(async (req, res) => {
+router.get('/:id/subjects', authenticateToken, asyncHandler(async (req, res) => {
   const category = await Category.findById(req.params.id);
   if (!category) {
     return res.status(404).json({ error: 'Category not found' });

@@ -11,6 +11,8 @@ import {
   ChartBarIcon,
   TagIcon
 } from '@heroicons/react/24/outline';
+import RichTextEditor from '../../components/RichTextEditor';
+import RichTextRenderer from '../../components/RichTextRenderer';
 
 interface Category {
   _id: string;
@@ -98,6 +100,14 @@ const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Category form data being submitted:', formData);
+    
+    // Client-side validation
+    if (!formData.name.trim()) {
+      alert('Category name is required');
+      return;
+    }
+    
     onSubmit(formData);
   };
 
@@ -295,11 +305,11 @@ const CreateSubjectModal: React.FC<CreateSubjectModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Description
             </label>
-            <textarea
+            <RichTextEditor
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+              placeholder="Enter subject description with formatting, bullet points, and mathematical equations..."
+              className="w-full"
             />
           </div>
 
@@ -503,13 +513,26 @@ export default function SubjectsPage() {
       const url = editingCategory ? `/api/categories/${editingCategory._id}` : '/api/categories';
       const method = editingCategory ? 'PUT' : 'POST';
 
+      console.log('Sending category data:', formData);
+
+      // Ensure all required fields are present and valid
+      const categoryData = {
+        name: formData.name.trim(),
+        description: formData.description || '',
+        color: formData.color || '#3B82F6',
+        icon: formData.icon || '🏷️',
+        order: parseInt(formData.order) || 0
+      };
+
+      console.log('Processed category data:', categoryData);
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(categoryData)
       });
 
       if (response.ok) {
@@ -518,6 +541,7 @@ export default function SubjectsPage() {
         loadCategories();
       } else {
         const error = await response.json();
+        console.error('Category creation error:', error);
         alert(error.message || 'Failed to save category');
       }
     } catch (error) {
@@ -628,30 +652,43 @@ export default function SubjectsPage() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Subjects Management</h1>
-          <p className="text-gray-600">Manage subjects, categories, chapters, and topics hierarchy</p>
+      {/* Header with Navigation */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-4">
+            <a
+              href="/admin"
+              className="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Dashboard
+            </a>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <h1 className="text-2xl font-bold text-gray-900">Subjects Management</h1>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => {
+                setEditingCategory(null);
+                setCategoryModalOpen(true);
+              }}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              <TagIcon className="h-4 w-4 mr-2" />
+              Add Category
+            </button>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Add Subject
+            </button>
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => {
-              setEditingCategory(null);
-              setCategoryModalOpen(true);
-            }}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            <TagIcon className="h-4 w-4 mr-2" />
-            Add Category
-          </button>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Add Subject
-          </button>
-        </div>
+        <p className="text-gray-600">Manage subjects, categories, chapters, and topics hierarchy</p>
       </div>
 
       {/* Tabs */}
@@ -772,7 +809,9 @@ export default function SubjectsPage() {
                 </div>
 
                 {subject.description && (
-                  <p className="text-sm text-gray-600 mb-4">{subject.description}</p>
+                  <div className="text-sm text-gray-600 mb-4">
+                    <RichTextRenderer content={subject.description} />
+                  </div>
                 )}
 
                 <div className="flex flex-wrap gap-2 mb-4">
