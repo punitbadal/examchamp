@@ -15,6 +15,18 @@ import {
 } from '@heroicons/react/24/outline';
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
+import RichTextRenderer from './RichTextRenderer';
+
+interface QuestionImage {
+  url: string;
+  key: string;
+  caption: string;
+  alt: string;
+}
+
+interface OptionImage extends QuestionImage {
+  optionIndex: number;
+}
 
 interface Question {
   id: string;
@@ -27,6 +39,11 @@ interface Question {
   negativeMarks: number;
   subject: string;
   section: string;
+  // Add image arrays
+  questionImages?: QuestionImage[];
+  optionImages?: OptionImage[];
+  explanationImages?: QuestionImage[];
+  explanation?: string;
 }
 
 interface ExamSection {
@@ -216,8 +233,29 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({
         {/* Question Text */}
         <div className="text-lg leading-relaxed">
           <div className="prose prose-lg max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: currentQuestion.questionText }} />
+            <RichTextRenderer content={currentQuestion.questionText} />
           </div>
+          
+          {/* Question Images */}
+          {currentQuestion.questionImages && currentQuestion.questionImages.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {currentQuestion.questionImages.map((image, index) => (
+                <div key={index} className="flex flex-col items-center">
+                  <img
+                    src={image.url}
+                    alt={image.alt || `Question image ${index + 1}`}
+                    className="max-w-full h-auto rounded-lg shadow-sm border"
+                    style={{ maxHeight: '400px' }}
+                  />
+                  {image.caption && (
+                    <p className="text-sm text-gray-600 mt-2 text-center italic">
+                      {image.caption}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Options */}
@@ -227,7 +265,11 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({
               <label
                 key={index}
                 className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                  currentQuestionState.answer === option
+                  currentQuestion.questionType === 'mcq_multiple'
+                    ? Array.isArray(currentQuestionState.answer) && currentQuestionState.answer.includes(option)
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                    : currentQuestionState.answer === option
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -254,12 +296,36 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({
                   }}
                   className="mt-1"
                 />
-                <div className="flex items-center space-x-3 flex-1">
+                <div className="flex items-start space-x-3 flex-1">
                   <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-semibold">
                     {String.fromCharCode(65 + index)}
                   </div>
                   <div className="flex-1">
-                    <div dangerouslySetInnerHTML={{ __html: option }} />
+                    <RichTextRenderer content={option} />
+                    
+                    {/* Option Images */}
+                    {currentQuestion.optionImages && 
+                     currentQuestion.optionImages.filter(img => img.optionIndex === index).length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {currentQuestion.optionImages
+                          .filter(img => img.optionIndex === index)
+                          .map((image, imgIndex) => (
+                            <div key={imgIndex} className="flex flex-col items-center">
+                              <img
+                                src={image.url}
+                                alt={image.alt || `Option ${String.fromCharCode(65 + index)} image ${imgIndex + 1}`}
+                                className="max-w-full h-auto rounded-lg shadow-sm border"
+                                style={{ maxHeight: '200px' }}
+                              />
+                              {image.caption && (
+                                <p className="text-sm text-gray-600 mt-1 text-center italic">
+                                  {image.caption}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </label>
@@ -280,6 +346,37 @@ const ExamInterface: React.FC<ExamInterfaceProps> = ({
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter numerical value"
             />
+          </div>
+        )}
+
+        {/* Explanation (if available) */}
+        {currentQuestion.explanation && (
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">Explanation:</h4>
+            <div className="prose prose-sm max-w-none">
+              <RichTextRenderer content={currentQuestion.explanation} />
+            </div>
+            
+            {/* Explanation Images */}
+            {currentQuestion.explanationImages && currentQuestion.explanationImages.length > 0 && (
+              <div className="mt-4 space-y-3">
+                {currentQuestion.explanationImages.map((image, index) => (
+                  <div key={index} className="flex flex-col items-center">
+                    <img
+                      src={image.url}
+                      alt={image.alt || `Explanation image ${index + 1}`}
+                      className="max-w-full h-auto rounded-lg shadow-sm border"
+                      style={{ maxHeight: '300px' }}
+                    />
+                    {image.caption && (
+                      <p className="text-sm text-gray-600 mt-2 text-center italic">
+                        {image.caption}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
