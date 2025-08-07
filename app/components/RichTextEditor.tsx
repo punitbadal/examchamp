@@ -10,6 +10,7 @@ import BulletList from '@tiptap/extension-bullet-list';
 import OrderedList from '@tiptap/extension-ordered-list';
 import ListItem from '@tiptap/extension-list-item';
 import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
 
@@ -19,7 +20,93 @@ interface RichTextEditorProps {
   placeholder?: string;
   className?: string;
   readOnly?: boolean;
+  onImageUpload?: (file: File) => Promise<string>;
 }
+
+// Math detection and conversion functions
+const detectMathContent = (text: string): string[] => {
+  const mathPatterns = [
+    // Common mathematical expressions
+    /\b(sin|cos|tan|log|ln|sqrt|sum|prod|int|lim|infinity|pi|theta|alpha|beta|gamma|delta|epsilon|phi|omega)\b/gi,
+    // Fractions like a/b
+    /\b\d+\/\d+\b/g,
+    // Powers like x^2, x^3
+    /\b\w+\^\d+\b/g,
+    // Subscripts like x_1, x_2
+    /\b\w+_\d+\b/g,
+    // Greek letters
+    /[αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ]/g,
+    // Mathematical symbols
+    /[±×÷√∑∏∫∂∞≈≠≤≥]/g
+  ];
+  
+  const detectedMath: string[] = [];
+  mathPatterns.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      detectedMath.push(...matches);
+    }
+  });
+  
+  return [...new Set(detectedMath)];
+};
+
+const convertToLaTeX = (text: string): string => {
+  let latex = text;
+  
+  // Convert common mathematical expressions to LaTeX
+  const conversions: { [key: string]: string } = {
+    'sin': '\\sin',
+    'cos': '\\cos', 
+    'tan': '\\tan',
+    'log': '\\log',
+    'ln': '\\ln',
+    'sqrt': '\\sqrt',
+    'sum': '\\sum',
+    'prod': '\\prod',
+    'int': '\\int',
+    'lim': '\\lim',
+    'infinity': '\\infty',
+    'pi': '\\pi',
+    'theta': '\\theta',
+    'alpha': '\\alpha',
+    'beta': '\\beta',
+    'gamma': '\\gamma',
+    'delta': '\\delta',
+    'epsilon': '\\epsilon',
+    'phi': '\\phi',
+    'omega': '\\omega',
+    '±': '\\pm',
+    '×': '\\times',
+    '÷': '\\div',
+    '√': '\\sqrt',
+    '∑': '\\sum',
+    '∏': '\\prod',
+    '∫': '\\int',
+    '∂': '\\partial',
+    '∞': '\\infty',
+    '≈': '\\approx',
+    '≠': '\\neq',
+    '≤': '\\leq',
+    '≥': '\\geq'
+  };
+  
+  Object.entries(conversions).forEach(([original, latexCmd]) => {
+    const regex = new RegExp(`\\b${original}\\b`, 'gi');
+    latex = latex.replace(regex, latexCmd);
+  });
+  
+  // Handle fractions (a/b -> \frac{a}{b})
+  latex = latex.replace(/(\d+)\/(\d+)/g, '\\frac{$1}{$2}');
+  
+  // Handle powers (x^2 -> x^{2})
+  latex = latex.replace(/(\w+)\^(\d+)/g, '$1^{$2}');
+  
+  // Handle subscripts (x_1 -> x_{1})
+  latex = latex.replace(/(\w+)_(\d+)/g, '$1_{$2}');
+  
+  return latex;
+};
 
 // Simple math insertion function
 const insertMath = (editor: any, content: string, isBlock: boolean = false) => {
@@ -32,11 +119,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onChange,
   placeholder = 'Start typing...',
   className = '',
-  readOnly = false
+  readOnly = false,
+  onImageUpload
 }) => {
   const [showMathInput, setShowMathInput] = useState(false);
   const [mathInput, setMathInput] = useState('');
   const [mathType, setMathType] = useState<'inline' | 'block'>('inline');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -52,6 +141,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       Placeholder.configure({
         placeholder,
       }),
+      Image.configure({
+        HTMLAttributes: {
+          class: 'max-w-full h-auto',
+        },
+      }),
     ],
     content: value,
     editable: !readOnly,
@@ -65,6 +159,91 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       editor.commands.setContent(value);
     }
   }, [value, editor]);
+
+  // Enhanced paste handling for mathematical content
+  useEffect(() => {
+    if (!editor) return;
+
+    const handlePaste = async (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      // Check for images first
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          event.preventDefault();
+          const file = item.getAsFile();
+          if (file && onImageUpload) {
+            try {
+              setUploadingImage(true);
+              const imageUrl = await onImageUpload(file);
+              editor.chain().focus().setImage({ src: imageUrl }).run();
+            } catch (error) {
+              console.error('Failed to upload pasted image:', error);
+            } finally {
+              setUploadingImage(false);
+            }
+          }
+          return;
+        }
+      }
+
+      // Handle text content with math detection
+      const text = event.clipboardData?.getData('text/plain');
+      if (text) {
+        const detectedMath = detectMathContent(text);
+        
+        if (detectedMath.length > 0) {
+          event.preventDefault();
+          
+          // If significant math content is detected, convert to LaTeX
+          const mathRatio = detectedMath.length / text.split(' ').length;
+          
+          if (mathRatio > 0.1) { // If more than 10% of content is math
+            const latexContent = convertToLaTeX(text);
+            const mathBlock = `$$${latexContent}$$`;
+            editor.commands.insertContent(mathBlock);
+          } else {
+            // Insert as regular text but highlight potential math
+            editor.commands.insertContent(text);
+          }
+        }
+      }
+    };
+
+    const handleDrop = async (event: DragEvent) => {
+      event.preventDefault();
+      const files = event.dataTransfer?.files;
+      if (!files || files.length === 0) return;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+          if (onImageUpload) {
+            try {
+              setUploadingImage(true);
+              const imageUrl = await onImageUpload(file);
+              editor.chain().focus().setImage({ src: imageUrl }).run();
+            } catch (error) {
+              console.error('Failed to upload dropped image:', error);
+            } finally {
+              setUploadingImage(false);
+            }
+          }
+          break;
+        }
+      }
+    };
+
+    editor.view.dom.addEventListener('paste', handlePaste);
+    editor.view.dom.addEventListener('drop', handleDrop);
+
+    return () => {
+      editor.view.dom.removeEventListener('paste', handlePaste);
+      editor.view.dom.removeEventListener('drop', handleDrop);
+    };
+  }, [editor, onImageUpload]);
 
   if (!editor) {
     return null;
@@ -80,6 +259,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   const MenuBar = () => {
     if (readOnly) return null;
+
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file && onImageUpload) {
+        try {
+          setUploadingImage(true);
+          const imageUrl = await onImageUpload(file);
+          editor.chain().focus().setImage({ src: imageUrl }).run();
+        } catch (error) {
+          console.error('Failed to upload image:', error);
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+    };
 
     return (
       <div className="border-b border-gray-200 p-2 bg-gray-50 rounded-t-md">
@@ -181,6 +375,26 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           >
             →
           </button>
+
+          <div className="w-px bg-gray-300 mx-1"></div>
+
+          {/* Image Upload */}
+          {onImageUpload && (
+            <>
+              <label className="p-2 rounded hover:bg-gray-100 cursor-pointer" title="Upload Image">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                📷
+              </label>
+              {uploadingImage && (
+                <span className="p-2 text-sm text-gray-500">Uploading...</span>
+              )}
+            </>
+          )}
 
           <div className="w-px bg-gray-300 mx-1"></div>
 

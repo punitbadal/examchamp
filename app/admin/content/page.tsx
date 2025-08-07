@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   AcademicCapIcon,
@@ -21,9 +22,11 @@ import {
 import Link from 'next/link';
 import CreatePracticeTestForm from '../../components/CreatePracticeTestForm';
 import CreateStudyMaterialForm from '../../components/CreateStudyMaterialForm';
+import ContentUploadForm from '../../components/ContentUploadForm';
 
 interface ContentItem {
-  id: string;
+  _id: string;
+  id?: string;
   title: string;
   type: 'video' | 'document' | 'practice_test' | 'study_material';
   category: string;
@@ -38,6 +41,7 @@ interface ContentItem {
 }
 
 export default function ContentPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('library');
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +49,7 @@ export default function ContentPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateTestForm, setShowCreateTestForm] = useState(false);
   const [showCreateMaterialForm, setShowCreateMaterialForm] = useState(false);
+  const [showUploadForm, setShowUploadForm] = useState(false);
 
   useEffect(() => {
     fetchContentData();
@@ -69,6 +74,7 @@ export default function ContentPage() {
         // Fallback to mock data if API fails
         const mockContent: ContentItem[] = [
           {
+            _id: '1',
             id: '1',
             title: 'JEE Main Physics Formula Sheet',
             type: 'document',
@@ -124,7 +130,10 @@ export default function ContentPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Content Library</h2>
-        <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+        <button 
+          onClick={() => setShowUploadForm(true)}
+          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
           <PlusIcon className="w-4 h-4" />
           <span>Upload Content</span>
         </button>
@@ -217,15 +226,24 @@ export default function ContentPage() {
               </div>
 
               <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-gray-200">
-                <button className="flex items-center space-x-1 text-blue-600 hover:text-blue-900">
+                <button 
+                  onClick={() => handleViewContent(item)}
+                  className="flex items-center space-x-1 text-blue-600 hover:text-blue-900"
+                >
                   <EyeIcon className="w-4 h-4" />
                   <span className="text-sm">View</span>
                 </button>
-                <button className="flex items-center space-x-1 text-green-600 hover:text-green-900">
+                <button 
+                  onClick={() => handleEditContent(item)}
+                  className="flex items-center space-x-1 text-green-600 hover:text-green-900"
+                >
                   <PencilIcon className="w-4 h-4" />
                   <span className="text-sm">Edit</span>
                 </button>
-                <button className="flex items-center space-x-1 text-red-600 hover:text-red-900">
+                <button 
+                  onClick={() => handleDeleteContent(item)}
+                  className="flex items-center space-x-1 text-red-600 hover:text-red-900"
+                >
                   <TrashIcon className="w-4 h-4" />
                   <span className="text-sm">Delete</span>
                 </button>
@@ -391,6 +409,51 @@ export default function ContentPage() {
     }
   };
 
+  const handleContentUpload = async (data: any) => {
+    try {
+      console.log('Content uploaded successfully:', data);
+      alert('Content uploaded successfully!');
+      // Refresh the content
+      fetchContentData();
+    } catch (error) {
+      console.error('Error uploading content:', error);
+      alert('Error uploading content');
+    }
+  };
+
+  const handleViewContent = (item: ContentItem) => {
+    router.push(`/admin/content/view/${item._id}`);
+  };
+
+  const handleEditContent = (item: ContentItem) => {
+    router.push(`/admin/content/edit/${item._id}`);
+  };
+
+  const handleDeleteContent = async (item: ContentItem) => {
+    if (confirm(`Are you sure you want to delete "${item.title}"?`)) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/study-materials/${item.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          alert('Content deleted successfully!');
+          fetchContentData(); // Refresh the list
+        } else {
+          alert('Failed to delete content');
+        }
+      } catch (error) {
+        console.error('Error deleting content:', error);
+        alert('Error deleting content');
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -409,9 +472,18 @@ export default function ContentPage() {
               <AcademicCapIcon className="h-8 w-8 text-blue-600" />
               <span className="ml-2 text-xl font-bold text-gray-900">Content Management</span>
             </div>
-            <Link href="/admin" className="text-gray-600 hover:text-gray-900">
-              ← Back to Admin
-            </Link>
+            <div className="flex items-center space-x-4">
+              <Link 
+                href="/admin/practice-tests" 
+                className="flex items-center px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+              >
+                <DocumentTextIcon className="w-4 h-4 mr-2" />
+                Practice Tests
+              </Link>
+              <Link href="/admin" className="text-gray-600 hover:text-gray-900">
+                ← Back to Admin
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -461,6 +533,16 @@ export default function ContentPage() {
         onClose={() => setShowCreateMaterialForm(false)}
         onSubmit={handleCreateStudyMaterial}
       />
+      
+      {showUploadForm && (
+        <ContentUploadForm
+          onUploadSuccess={() => {
+            setShowUploadForm(false);
+            fetchContentData();
+          }}
+          onCancel={() => setShowUploadForm(false)}
+        />
+      )}
     </div>
   );
 } 

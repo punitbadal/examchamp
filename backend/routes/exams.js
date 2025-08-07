@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 const ExamAttempt = require('../models/ExamAttempt');
+const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -28,24 +29,24 @@ const upload = multer({
 // @route   POST /api/exams
 // @desc    Create a new exam
 // @access  Private (Admin only)
-router.post('/', [
+router.post('/', authenticateToken, authorize('admin', 'super_admin'), [
   body('title').trim().isLength({ min: 1, max: 200 }),
   body('description').optional().trim().isLength({ max: 1000 }),
   body('instructions').optional().trim().isLength({ max: 2000 }),
   body('totalMarks').isInt({ min: 1 }),
   body('duration').isInt({ min: 1 }),
-  body('startTime').isISO8601(),
-  body('endTime').isISO8601(),
-  body('examType').optional().isIn(['practice', 'mock', 'final']),
+  body('startTime').optional().isISO8601(),
+  body('endTime').optional().isISO8601(),
+  body('examType').optional().isIn(['practice', 'mock', 'final', 'live']),
   body('enrollment').optional().isIn(['open', 'invite_only', 'restricted']),
-  body('difficulty').optional().isIn(['Easy', 'Medium', 'Hard']),
+  body('difficulty').optional().isIn(['Easy', 'Medium', 'Hard', 'easy', 'medium', 'hard']),
   body('maxAttempts').optional().isInt({ min: 1 }),
   body('passingScore').optional().isInt({ min: 0 }),
   body('sections').optional().isArray(),
   body('settings').optional().isObject(),
   body('tags').optional().isArray(),
   body('category').optional().trim(),
-  body('allowedUsers').optional().isArray(),
+
   body('isPaid').optional().isBoolean(),
   body('price').optional().isFloat({ min: 0 }),
   body('currency').optional().isIn(['INR', 'USD', 'EUR'])
@@ -65,30 +66,37 @@ router.post('/', [
     endTime,
     examType = 'mock',
     enrollment = 'open',
-    difficulty = 'medium',
+    difficulty: rawDifficulty = 'Medium',
     maxAttempts = 1,
     passingScore,
     sections = [],
     settings = {},
     tags = [],
     category,
-    allowedUsers = [],
+
     isPaid = false,
     price = 0,
     currency = 'INR'
   } = req.body;
 
-  // Validate time constraints
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-  const now = new Date();
+  // Convert difficulty to proper case
+  const difficulty = rawDifficulty.charAt(0).toUpperCase() + rawDifficulty.slice(1).toLowerCase();
 
-  if (start <= now) {
-    return res.status(400).json({ error: 'Start time must be in the future' });
+  // Validate time constraints (only if provided)
+  let start, end;
+  if (startTime) {
+    start = new Date(startTime);
+    const now = new Date();
+    if (start <= now) {
+      return res.status(400).json({ error: 'Start time must be in the future' });
+    }
   }
-
-  if (end <= start) {
-    return res.status(400).json({ error: 'End time must be after start time' });
+  
+  if (endTime) {
+    end = new Date(endTime);
+    if (start && end <= start) {
+      return res.status(400).json({ error: 'End time must be after start time' });
+    }
   }
 
   // Validate payment settings
@@ -104,8 +112,8 @@ router.post('/', [
     examCode: req.body.examCode,
     totalMarks,
     totalDuration: duration, // Map duration to totalDuration
-    startTime: start,
-    endTime: end,
+    startTime: start || null,
+    endTime: end || null,
     examType,
     enrollment,
     difficulty,
@@ -114,11 +122,33 @@ router.post('/', [
     isPaid,
     price: isPaid ? price : 0,
     currency,
-    sections,
+    sections: sections.map(section => ({
+      name: section.name,
+      description: section.description,
+      questionCount: section.questionCount || 0,
+      timeLimit: section.timeLimit || Math.floor(duration / sections.length),
+      marksPerQuestion: section.marksPerQuestion || 4,
+      negativeMarksPerQuestion: 1,
+      subjects: section.subjects || [],
+      topics: section.topics || [],
+      instructions: section.instructions || '',
+      isOptional: false,
+      passingScore: null,
+      difficultyDistribution: {
+        easy: 0.3,
+        medium: 0.5,
+        hard: 0.2
+      },
+      questionTypes: ['MCQ_Single', 'MCQ_Multiple', 'Integer', 'Numerical'],
+      randomization: {
+        randomizeQuestions: true,
+        randomizeOptions: true,
+        randomizeSections: false
+      }
+    })),
     settings,
     tags,
     category,
-    allowedUsers,
     createdBy: new mongoose.Types.ObjectId() // Generate a new ObjectId for now
   });
 
@@ -133,7 +163,7 @@ router.post('/', [
 // @route   GET /api/exams
 // @desc    Get all exams (with filtering)
 // @access  Private
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', authenticateToken, asyncHandler(async (req, res) => {
   const {
     page = 1,
     limit = 10,
@@ -189,10 +219,9 @@ router.get('/', asyncHandler(async (req, res) => {
 // @route   GET /api/exams/:id
 // @desc    Get exam by ID
 // @access  Private
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get('/:id', authenticateToken, asyncHandler(async (req, res) => {
   const exam = await Exam.findById(req.params.id)
-    .populate('createdBy', 'firstName lastName')
-    .populate('allowedUsers', 'firstName lastName email');
+    .populate('createdBy', 'firstName lastName');
 
   if (!exam) {
     return res.status(404).json({ error: 'Exam not found' });
@@ -204,7 +233,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 // @route   PUT /api/exams/:id
 // @desc    Update exam
 // @access  Private (Admin only)
-router.put('/:id', [
+router.put('/:id', authenticateToken, authorize('admin', 'super_admin'), [
   body('title').optional().trim().isLength({ min: 1, max: 200 }),
   body('description').optional().trim().isLength({ max: 1000 }),
   body('instructions').optional().trim().isLength({ max: 2000 }),
@@ -234,7 +263,7 @@ router.put('/:id', [
 // @route   DELETE /api/exams/:id
 // @desc    Delete exam
 // @access  Private (Admin only)
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete('/:id', authenticateToken, authorize('admin', 'super_admin'), asyncHandler(async (req, res) => {
   const exam = await Exam.findById(req.params.id);
   if (!exam) {
     return res.status(404).json({ error: 'Exam not found' });

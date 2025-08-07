@@ -67,7 +67,7 @@ export default function UserManagement() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/users', {
+      const response = await fetch('http://localhost:3001/api/users', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -197,6 +197,34 @@ export default function UserManagement() {
     // Implement bulk actions (activate, deactivate, delete, etc.)
     console.log(`Bulk action: ${action} for users:`, selectedUsers);
     alert(`${action} action will be performed on ${selectedUsers.length} users`);
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:3001/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        alert('User deleted successfully');
+        loadUsers(); // Reload the users list
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to delete user: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Error deleting user');
+    }
   };
 
   if (loading) {
@@ -446,13 +474,25 @@ export default function UserManagement() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
-                        <button className="text-blue-600 hover:text-blue-900">
+                        <Link
+                          href={`/admin/users/view/${user.id}`}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View User"
+                        >
                           <EyeIcon className="h-4 w-4" />
-                        </button>
-                        <button className="text-green-600 hover:text-green-900">
+                        </Link>
+                        <Link
+                          href={`/admin/users/edit/${user.id}`}
+                          className="text-green-600 hover:text-green-900"
+                          title="Edit User"
+                        >
                           <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button className="text-red-600 hover:text-red-900">
+                        </Link>
+                        <button 
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete User"
+                        >
                           <TrashIcon className="h-4 w-4" />
                         </button>
                       </div>

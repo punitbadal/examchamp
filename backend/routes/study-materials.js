@@ -1,9 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { authenticateToken, authorize } = require('../middleware/auth');
 const StudyMaterial = require('../models/StudyMaterial');
 const multer = require('multer');
 const path = require('path');
+// const { uploadToR2, generateFileKey } = require('../config/cloudflare');
+
+// Simple fallback functions
+const uploadToR2 = async (file, key, contentType) => {
+  return {
+    success: true,
+    url: `/uploads/study-materials/${file.originalname}`,
+    key: key
+  };
+};
+
+const generateFileKey = (originalName, prefix = 'study-materials') => {
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const extension = originalName.split('.').pop();
+  return `${prefix}/${timestamp}-${randomString}.${extension}`;
+};
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -69,7 +86,7 @@ router.get('/', async (req, res) => {
     sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
     const studyMaterials = await StudyMaterial.find(query)
-      .populate('createdBy', 'name email')
+      .populate('createdBy', 'firstName lastName email')
       .sort(sortOptions)
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
@@ -113,10 +130,95 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// @route   POST /api/study-materials/upload
+// @desc    Upload content (Admin only)
+// @access  Private (Admin)
+router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin only.' });
+    }
+
+    const {
+      title,
+      description,
+      type,
+      subject,
+      topic,
+      category,
+      tags,
+      isPremium,
+      isPublic,
+      url
+    } = req.body;
+
+    // Validate required fields
+    if (!title || !description || !type) {
+      return res.status(400).json({ error: 'Title, description, and type are required' });
+    }
+
+    // Validate file upload for non-link types
+    if (type !== 'link' && !req.file) {
+      return res.status(400).json({ error: 'File is required for non-link content types' });
+    }
+
+    // Validate URL for link type
+    if (type === 'link' && !url) {
+      return res.status(400).json({ error: 'URL is required for link content type' });
+    }
+
+    const studyMaterialData = {
+      title,
+      description,
+      type,
+      subject: subject || '',
+      topic: topic || '',
+      category: category || '',
+      tags: tags ? JSON.parse(tags) : [],
+      isPremium: isPremium === 'true',
+      isPublic: isPublic !== 'false',
+      createdBy: req.user.id,
+      status: 'published'
+    };
+
+    // Add file information if uploaded
+    if (req.file) {
+      // Upload to Cloudflare R2 for documents
+      const fileKey = generateFileKey(req.file.originalname, 'study-materials');
+      const uploadResult = await uploadToR2(req.file, fileKey, req.file.mimetype);
+      
+      if (uploadResult.success) {
+        studyMaterialData.fileUrl = uploadResult.url;
+        studyMaterialData.fileName = req.file.originalname;
+        studyMaterialData.fileSize = req.file.size;
+      } else {
+        return res.status(500).json({ error: 'Failed to upload file to cloud storage' });
+      }
+    }
+
+    // Add URL for link type
+    if (type === 'link' && url) {
+      studyMaterialData.url = url;
+    }
+
+    const studyMaterial = new StudyMaterial(studyMaterialData);
+    await studyMaterial.save();
+
+    res.status(201).json({
+      message: 'Content uploaded successfully',
+      studyMaterial
+    });
+  } catch (error) {
+    console.error('Error uploading content:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // @route   POST /api/study-materials
 // @desc    Create a new study material (Admin only)
 // @access  Private (Admin)
-router.post('/', auth, upload.single('file'), async (req, res) => {
+router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== 'admin') {
@@ -182,7 +284,7 @@ router.post('/', auth, upload.single('file'), async (req, res) => {
 // @route   PUT /api/study-materials/:id
 // @desc    Update study material (Admin only)
 // @access  Private (Admin)
-router.put('/:id', auth, upload.single('file'), async (req, res) => {
+router.put('/:id', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== 'admin') {
@@ -235,7 +337,7 @@ router.put('/:id', auth, upload.single('file'), async (req, res) => {
 // @route   DELETE /api/study-materials/:id
 // @desc    Delete study material (Admin only)
 // @access  Private (Admin)
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== 'admin') {
@@ -259,7 +361,7 @@ router.delete('/:id', auth, async (req, res) => {
 // @route   POST /api/study-materials/:id/download
 // @desc    Record download and get download URL
 // @access  Private
-router.post('/:id/download', auth, async (req, res) => {
+router.post('/:id/download', authenticateToken, async (req, res) => {
   try {
     const studyMaterial = await StudyMaterial.findById(req.params.id);
     if (!studyMaterial) {
@@ -289,7 +391,7 @@ router.post('/:id/download', auth, async (req, res) => {
 // @route   POST /api/study-materials/:id/rate
 // @desc    Rate a study material
 // @access  Private
-router.post('/:id/rate', auth, async (req, res) => {
+router.post('/:id/rate', authenticateToken, async (req, res) => {
   try {
     const { rating } = req.body;
     

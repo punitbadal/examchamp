@@ -12,8 +12,21 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: function() {
+      // Password is required only for non-Firebase users
+      return !this.firebaseUid;
+    },
     minlength: 6
+  },
+  firebaseUid: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
   },
   firstName: {
     type: String,
@@ -85,9 +98,9 @@ userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ studentId: 1 });
 
-// Hash password before saving
+// Hash password before saving (only for non-Firebase users)
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || this.firebaseUid) return next();
   
   try {
     const salt = await bcrypt.genSalt(12);
@@ -98,8 +111,11 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Method to compare password
+// Method to compare password (only for non-Firebase users)
 userSchema.methods.comparePassword = async function(candidatePassword) {
+  if (this.firebaseUid) {
+    throw new Error('Firebase users should not use password authentication');
+  }
   return bcrypt.compare(candidatePassword, this.password);
 };
 

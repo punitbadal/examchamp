@@ -11,7 +11,7 @@ import {
   UserIcon,
   LockClosedIcon
 } from '@heroicons/react/24/outline'
-import AuthModal from './components/AuthModal'
+import FirebaseAuthModal from './components/FirebaseAuthModal'
 
 export default function HomePage() {
   const [isLoginOpen, setIsLoginOpen] = useState(false)
@@ -310,14 +310,14 @@ export default function HomePage() {
       </footer>
 
       {/* Authentication Modals */}
-      <AuthModal
+      <FirebaseAuthModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
         mode="login"
         onSuccess={handleAuthSuccess}
       />
       
-      <AuthModal
+      <FirebaseAuthModal
         isOpen={isRegisterOpen}
         onClose={() => setIsRegisterOpen(false)}
         mode="register"

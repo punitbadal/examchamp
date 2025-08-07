@@ -20,16 +20,19 @@ import { useRouter } from 'next/navigation';
 interface ImportedQuestion {
   id: string;
   questionText: string;
-  questionType: 'mcq' | 'numerical' | 'matrix_match' | 'assertion_reason';
+  questionType: 'MCQ_Single' | 'MCQ_Multiple' | 'TrueFalse' | 'Integer' | 'Numerical';
   subject: string;
   chapter: string;
   topic: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  marks: number;
-  negativeMarks: number;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  marksPerQuestion: number;
+  negativeMarksPerQuestion: number;
   options?: string[];
-  correctAnswer: string | string[];
+  correctAnswer: string | string[] | number | boolean;
   explanation: string;
+  questionImages?: string[];
+  optionImages?: string[];
+  explanationImages?: string[];
   tags: string[];
   status: 'valid' | 'invalid' | 'duplicate';
   errors?: string[];
@@ -109,13 +112,13 @@ export default function QuestionImport() {
         {
           id: '1',
           questionText: 'A particle moves along a straight line with velocity v = 3t² - 6t + 2 m/s. The acceleration of the particle at t = 2s is:',
-          questionType: 'mcq',
+          questionType: 'MCQ_Single',
           subject: 'Physics',
           chapter: 'Kinematics',
           topic: 'Motion in One Dimension',
-          difficulty: 'medium',
-          marks: 4,
-          negativeMarks: 1,
+          difficulty: 'Medium',
+          marksPerQuestion: 4,
+          negativeMarksPerQuestion: 1,
           options: ['6 m/s²', '8 m/s²', '10 m/s²', '12 m/s²'],
           correctAnswer: '6 m/s²',
           explanation: 'Acceleration is the derivative of velocity.',
@@ -125,14 +128,14 @@ export default function QuestionImport() {
         {
           id: '2',
           questionText: 'The value of ∫(x² + 2x + 1)dx from 0 to 2 is:',
-          questionType: 'numerical',
+          questionType: 'Numerical',
           subject: 'Mathematics',
           chapter: 'Calculus',
           topic: 'Integration',
-          difficulty: 'easy',
-          marks: 3,
-          negativeMarks: 0,
-          correctAnswer: '8',
+          difficulty: 'Easy',
+          marksPerQuestion: 3,
+          negativeMarksPerQuestion: 0,
+          correctAnswer: 8,
           explanation: '∫(x² + 2x + 1)dx = (x³/3 + x² + x) from 0 to 2 = 8',
           tags: ['calculus', 'integration'],
           status: 'valid'
@@ -140,13 +143,13 @@ export default function QuestionImport() {
         {
           id: '3',
           questionText: 'Match the following:\nColumn I: A) HCl B) H₂SO₄ C) HNO₃\nColumn II: 1) Monobasic 2) Dibasic 3) Tribasic',
-          questionType: 'matrix_match',
+          questionType: 'MCQ_Multiple',
           subject: 'Chemistry',
           chapter: 'Acids and Bases',
           topic: 'Types of Acids',
-          difficulty: 'medium',
-          marks: 4,
-          negativeMarks: 1,
+          difficulty: 'Medium',
+          marksPerQuestion: 4,
+          negativeMarksPerQuestion: 1,
           correctAnswer: ['A-1', 'B-2', 'C-1'],
           explanation: 'HCl is monobasic, H₂SO₄ is dibasic, HNO₃ is monobasic',
           tags: ['acids', 'basicity'],
@@ -155,13 +158,13 @@ export default function QuestionImport() {
         {
           id: '4',
           questionText: 'What is the capital of France?',
-          questionType: 'mcq',
+          questionType: 'MCQ_Single',
           subject: 'General Knowledge',
           chapter: 'Geography',
           topic: 'Countries and Capitals',
-          difficulty: 'easy',
-          marks: 2,
-          negativeMarks: 0,
+          difficulty: 'Easy',
+          marksPerQuestion: 2,
+          negativeMarksPerQuestion: 0,
           options: ['London', 'Berlin', 'Paris', 'Madrid'],
           correctAnswer: 'Paris',
           explanation: 'Paris is the capital of France.',
@@ -171,13 +174,13 @@ export default function QuestionImport() {
         {
           id: '5',
           questionText: '',
-          questionType: 'mcq',
+          questionType: 'MCQ_Single',
           subject: '',
           chapter: '',
           topic: '',
-          difficulty: 'easy',
-          marks: 0,
-          negativeMarks: 0,
+          difficulty: 'Easy',
+          marksPerQuestion: 0,
+          negativeMarksPerQuestion: 0,
           correctAnswer: '',
           explanation: '',
           tags: [],
@@ -216,9 +219,9 @@ export default function QuestionImport() {
 
   const handleExport = () => {
     // Create sample CSV content
-    const csvContent = `questionText,questionType,subject,chapter,topic,difficulty,marks,negativeMarks,options,correctAnswer,explanation,tags
-"A particle moves along a straight line with velocity v = 3t² - 6t + 2 m/s. The acceleration of the particle at t = 2s is:",mcq,Physics,Kinematics,Motion in One Dimension,medium,4,1,"6 m/s²|8 m/s²|10 m/s²|12 m/s²",6 m/s²,"Acceleration is the derivative of velocity.","kinematics|derivatives"
-"The value of ∫(x² + 2x + 1)dx from 0 to 2 is:",numerical,Mathematics,Calculus,Integration,easy,3,0,,8,"∫(x² + 2x + 1)dx = (x³/3 + x² + x) from 0 to 2 = 8","calculus|integration"`;
+    const csvContent = `questionText,questionType,subject,chapter,topic,difficulty,marksPerQuestion,negativeMarksPerQuestion,options,correctAnswer,explanation,tags
+"A particle moves along a straight line with velocity v = 3t² - 6t + 2 m/s. The acceleration of the particle at t = 2s is:",MCQ_Single,Physics,Kinematics,Motion in One Dimension,Medium,4,1,"6 m/s²|8 m/s²|10 m/s²|12 m/s²",6 m/s²,"Acceleration is the derivative of velocity.","kinematics|derivatives"
+"The value of ∫(x² + 2x + 1)dx from 0 to 2 is:",Numerical,Mathematics,Calculus,Integration,Easy,3,0,,8,"∫(x² + 2x + 1)dx = (x³/3 + x² + x) from 0 to 2 = 8","calculus|integration"`;
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -333,10 +336,10 @@ export default function QuestionImport() {
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Required Columns</h3>
                 <div className="text-xs text-gray-600 space-y-1">
                   <div>• questionText (required)</div>
-                  <div>• questionType: mcq, numerical, matrix_match, assertion_reason</div>
+                  <div>• questionType: MCQ_Single, MCQ_Multiple, TrueFalse, Integer, Numerical</div>
                   <div>• subject, chapter, topic (required)</div>
-                  <div>• difficulty: easy, medium, hard</div>
-                  <div>• marks, negativeMarks (numbers)</div>
+                  <div>• difficulty: Easy, Medium, Hard</div>
+                  <div>• marksPerQuestion, negativeMarksPerQuestion (numbers)</div>
                   <div>• options (pipe-separated for MCQ)</div>
                   <div>• correctAnswer</div>
                   <div>• explanation (required)</div>
@@ -543,7 +546,7 @@ export default function QuestionImport() {
                         {question.subject}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {question.marks}
+                        {question.marksPerQuestion}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">

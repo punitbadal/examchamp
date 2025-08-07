@@ -19,25 +19,45 @@ import {
 import Link from 'next/link';
 
 interface Question {
-  id: string;
+  _id: string;
+  questionNumber: number;
   questionText: string;
-  questionType: 'mcq' | 'numerical' | 'matrix_match' | 'assertion_reason';
+  questionType: 'MCQ_Single' | 'MCQ_Multiple' | 'TrueFalse' | 'Integer' | 'Numerical';
   subject: string;
   chapter: string;
   topic: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  marks: number;
-  negativeMarks: number;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  marksPerQuestion: number;
+  negativeMarksPerQuestion: number;
   options?: string[];
-  correctAnswer: string | string[];
+  correctAnswer: string | string[] | number | boolean;
   explanation: string;
-  imageUrl?: string;
+  questionImages?: Array<{
+    url: string;
+    key: string;
+    caption: string;
+    alt: string;
+  }>;
+  optionImages?: Array<{
+    optionIndex: number;
+    url: string;
+    key: string;
+    caption: string;
+    alt: string;
+  }>;
+  explanationImages?: Array<{
+    url: string;
+    key: string;
+    caption: string;
+    alt: string;
+  }>;
   tags: string[];
   isActive: boolean;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
-  usageCount: number;
+  timeEstimate?: number;
+  complexityScore?: number;
 }
 
 export default function QuestionManagement() {
@@ -50,6 +70,15 @@ export default function QuestionManagement() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 0
+  });
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Check if user is authenticated and is admin
@@ -69,17 +98,59 @@ export default function QuestionManagement() {
       }
       
       loadQuestions();
+      loadSubjects();
+      loadChapters();
     } catch (error) {
       console.error('Error parsing user data:', error);
       window.location.href = '/';
     }
   }, []);
 
+  // Reload questions when filters change
+  useEffect(() => {
+    if (pagination.page > 0) {
+      loadQuestions();
+    }
+  }, [subjectFilter, chapterFilter, difficultyFilter, typeFilter, pagination.page]);
+
+  // Debounced search
+  useEffect(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      setPagination(prev => ({ ...prev, page: 1 }));
+      loadQuestions();
+    }, 500);
+
+    setSearchTimeout(timeout);
+
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [searchTerm]);
+
   const loadQuestions = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/questions', {
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString()
+      });
+      
+      if (subjectFilter !== 'all') params.append('subject', subjectFilter);
+      if (chapterFilter !== 'all') params.append('chapter', chapterFilter);
+      if (difficultyFilter !== 'all') params.append('difficulty', difficultyFilter);
+      if (typeFilter !== 'all') params.append('questionType', typeFilter);
+      if (searchTerm) params.append('search', searchTerm);
+
+      const response = await fetch(`/api/questions?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -89,42 +160,59 @@ export default function QuestionManagement() {
       if (response.ok) {
         const data = await response.json();
         setQuestions(data.questions || []);
+        setPagination(data.pagination || {
+          page: 1,
+          limit: 20,
+          total: 0,
+          pages: 0
+        });
       } else {
         console.error('Failed to fetch questions');
-        // Fallback to mock data if API fails
-        const mockQuestions: Question[] = [
-          {
-            id: '1',
-            questionText: 'A particle moves along a straight line with velocity v = 3t² - 6t + 2 m/s. The acceleration of the particle at t = 2s is:',
-            questionType: 'mcq',
-            subject: 'Physics',
-            chapter: 'Kinematics',
-            topic: 'Motion in One Dimension',
-            difficulty: 'medium',
-            marks: 4,
-            negativeMarks: 1,
-            options: [
-              '6 m/s²',
-              '8 m/s²',
-              '10 m/s²',
-              '12 m/s²'
-            ],
-            correctAnswer: '6 m/s²',
-            explanation: 'Acceleration is the derivative of velocity. a = dv/dt = 6t - 6. At t = 2s, a = 6(2) - 6 = 6 m/s²',
-            tags: ['kinematics', 'derivatives', 'motion'],
-            isActive: true,
-            createdBy: 'admin@gmail.com',
-            createdAt: '2025-07-25T10:00:00.000Z',
-            updatedAt: '2025-07-25T10:00:00.000Z',
-            usageCount: 15
-          }
-        ];
-        setQuestions(mockQuestions);
+        setQuestions([]);
       }
     } catch (error) {
       console.error('Error loading questions:', error);
+      setQuestions([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSubjects = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/subjects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSubjects(data.data?.docs || []);
+      }
+    } catch (error) {
+      console.error('Error loading subjects:', error);
+    }
+  };
+
+  const loadChapters = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/chapters', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setChapters(data.data?.docs || []);
+      }
+    } catch (error) {
+      console.error('Error loading chapters:', error);
     }
   };
 
@@ -195,7 +283,7 @@ export default function QuestionManagement() {
     if (selectedQuestions.length === filteredQuestions.length) {
       setSelectedQuestions([]);
     } else {
-      setSelectedQuestions(filteredQuestions.map(q => q.id));
+      setSelectedQuestions(filteredQuestions.map(q => q._id));
     }
   };
 
@@ -234,7 +322,7 @@ export default function QuestionManagement() {
 
       if (response.ok) {
         // Remove question from state
-        setQuestions(prev => prev.filter(q => q.id !== questionId));
+        setQuestions(prev => prev.filter(q => q._id !== questionId));
         alert('Question deleted successfully');
       } else {
         console.error('Failed to delete question');
@@ -340,10 +428,11 @@ export default function QuestionManagement() {
               className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Subjects</option>
-              <option value="Physics">Physics</option>
-              <option value="Chemistry">Chemistry</option>
-              <option value="Mathematics">Mathematics</option>
-              <option value="Biology">Biology</option>
+              {subjects.map(subject => (
+                <option key={subject._id} value={subject.name}>
+                  {subject.name}
+                </option>
+              ))}
             </select>
 
             {/* Chapter Filter */}
@@ -353,10 +442,11 @@ export default function QuestionManagement() {
               className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Chapters</option>
-              <option value="Kinematics">Kinematics</option>
-              <option value="Calculus">Calculus</option>
-              <option value="Acids and Bases">Acids and Bases</option>
-              <option value="Cell Biology">Cell Biology</option>
+              {chapters.map(chapter => (
+                <option key={chapter._id} value={chapter.name}>
+                  {chapter.name}
+                </option>
+              ))}
             </select>
 
             {/* Difficulty Filter */}
@@ -366,9 +456,9 @@ export default function QuestionManagement() {
               className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Difficulties</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
+              <option value="Easy">Easy</option>
+              <option value="Medium">Medium</option>
+              <option value="Hard">Hard</option>
             </select>
 
             {/* Type Filter */}
@@ -378,10 +468,11 @@ export default function QuestionManagement() {
               className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Types</option>
-              <option value="mcq">MCQ</option>
-              <option value="numerical">Numerical</option>
-              <option value="matrix_match">Matrix Match</option>
-              <option value="assertion_reason">Assertion-Reason</option>
+              <option value="MCQ_Single">Single Choice MCQ</option>
+              <option value="MCQ_Multiple">Multiple Choice MCQ</option>
+              <option value="TrueFalse">True/False</option>
+              <option value="Integer">Integer</option>
+              <option value="Numerical">Numerical</option>
             </select>
 
             {/* View Mode Toggle */}
@@ -435,7 +526,7 @@ export default function QuestionManagement() {
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredQuestions.map((question) => (
               <motion.div
-                key={question.id}
+                key={question._id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow"
@@ -461,14 +552,14 @@ export default function QuestionManagement() {
                       <div className="text-xs text-gray-500 space-y-1">
                         <div>Chapter: {question.chapter}</div>
                         <div>Topic: {question.topic}</div>
-                        <div>Marks: {question.marks} | Negative: {question.negativeMarks}</div>
-                        <div>Used: {question.usageCount} times</div>
+                        <div>Marks: {question.marksPerQuestion} | Negative: {question.negativeMarksPerQuestion}</div>
+                        <div>Question #{question.questionNumber}</div>
                       </div>
                     </div>
                     <input
                       type="checkbox"
-                      checked={selectedQuestions.includes(question.id)}
-                      onChange={() => handleSelectQuestion(question.id)}
+                      checked={selectedQuestions.includes(question._id)}
+                      onChange={() => handleSelectQuestion(question._id)}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                   </div>
@@ -479,21 +570,21 @@ export default function QuestionManagement() {
                   <div className="flex items-center justify-between">
                     <div className="flex space-x-2">
                       <button 
-                        onClick={() => handleViewQuestion(question.id)}
+                        onClick={() => handleViewQuestion(question._id)}
                         className="text-blue-600 hover:text-blue-900 p-1"
                         title="View Question"
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
                       <button 
-                        onClick={() => handleEditQuestion(question.id)}
+                        onClick={() => handleEditQuestion(question._id)}
                         className="text-green-600 hover:text-green-900 p-1"
                         title="Edit Question"
                       >
                         <PencilIcon className="h-4 w-4" />
                       </button>
                       <button 
-                        onClick={() => handleDeleteQuestion(question.id)}
+                        onClick={() => handleDeleteQuestion(question._id)}
                         className="text-red-600 hover:text-red-900 p-1"
                         title="Delete Question"
                       >
@@ -542,7 +633,7 @@ export default function QuestionManagement() {
                       Marks
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Usage
+                      Question #
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -551,12 +642,12 @@ export default function QuestionManagement() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredQuestions.map((question) => (
-                    <tr key={question.id} className="hover:bg-gray-50">
+                    <tr key={question._id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="checkbox"
-                          checked={selectedQuestions.includes(question.id)}
-                          onChange={() => handleSelectQuestion(question.id)}
+                          checked={selectedQuestions.includes(question._id)}
+                          onChange={() => handleSelectQuestion(question._id)}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                       </td>
@@ -584,29 +675,29 @@ export default function QuestionManagement() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {question.marks} | -{question.negativeMarks}
+                        {question.marksPerQuestion} | -{question.negativeMarksPerQuestion}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {question.usageCount}
+                        #{question.questionNumber}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
                           <button 
-                            onClick={() => handleViewQuestion(question.id)}
+                            onClick={() => handleViewQuestion(question._id)}
                             className="text-blue-600 hover:text-blue-900"
                             title="View Question"
                           >
                             <EyeIcon className="h-4 w-4" />
                           </button>
                           <button 
-                            onClick={() => handleEditQuestion(question.id)}
+                            onClick={() => handleEditQuestion(question._id)}
                             className="text-green-600 hover:text-green-900"
                             title="Edit Question"
                           >
                             <PencilIcon className="h-4 w-4" />
                           </button>
                           <button 
-                            onClick={() => handleDeleteQuestion(question.id)}
+                            onClick={() => handleDeleteQuestion(question._id)}
                             className="text-red-600 hover:text-red-900"
                             title="Delete Question"
                           >
@@ -618,6 +709,34 @@ export default function QuestionManagement() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.pages > 1 && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-gray-700">
+              Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                disabled={pagination.page <= 1}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="px-3 py-2 text-sm text-gray-700">
+                Page {pagination.page} of {pagination.pages}
+              </span>
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                disabled={pagination.page >= pagination.pages}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
             </div>
           </div>
         )}

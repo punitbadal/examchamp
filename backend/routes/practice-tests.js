@@ -11,15 +11,15 @@ const router = express.Router();
 
 // @route   GET /api/practice-tests
 // @desc    Get all practice tests with filtering
-// @access  Public
-router.get('/', asyncHandler(async (req, res) => {
+// @access  Private
+router.get('/', authenticateToken, asyncHandler(async (req, res) => {
   const {
     type,
     level,
     courseId,
     chapterId,
     topicId,
-    status = 'published',
+    status,
     search,
     page = 1,
     limit = 12,
@@ -27,7 +27,17 @@ router.get('/', asyncHandler(async (req, res) => {
     sortOrder = 'desc'
   } = req.query;
 
-  const query = { isActive: true, status };
+  const query = { isActive: true };
+  
+  // If status is specified, filter by it. Otherwise, show all tests for admin users
+  if (status) {
+    query.status = status;
+  } else {
+    // For admin users, show all tests. For public users, show only published tests
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+      query.status = 'published';
+    }
+  }
   
   if (type) query.type = type;
   if (level) query.level = level;
@@ -95,7 +105,6 @@ router.get('/:id', asyncHandler(async (req, res) => {
 // @access  Private (Admin/Instructor)
 router.post('/', [
   authenticateToken,
-  authorize(['admin', 'instructor']),
   body('title').trim().notEmpty().withMessage('Title is required'),
   body('code').trim().notEmpty().withMessage('Code is required'),
   body('type').isIn(['topic_quiz', 'chapter_test', 'subject_test', 'mock_exam', 'custom']),
@@ -107,6 +116,15 @@ router.post('/', [
   body('access.isPaid').optional().isBoolean(),
   body('access.price').optional().isFloat({ min: 0 })
 ], asyncHandler(async (req, res) => {
+  // Check if user is admin or instructor
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'instructor')) {
+    return res.status(403).json({ 
+      status: 'fail',
+      message: 'Insufficient permissions',
+      requestId: 'unknown',
+      timestamp: new Date().toISOString()
+    });
+  }
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -492,6 +510,45 @@ router.post('/:id/feedback', [
 
   res.json({
     message: 'Feedback submitted successfully'
+  });
+}));
+
+// @route   DELETE /api/practice-tests/:id
+// @desc    Delete a practice test
+// @access  Private (Admin only)
+router.delete('/:id', [
+  authenticateToken
+], asyncHandler(async (req, res) => {
+  // Check if user is admin
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ 
+      status: 'fail',
+      message: 'Insufficient permissions',
+      requestId: 'unknown',
+      timestamp: new Date().toISOString()
+    });
+  }
+  const practiceTest = await PracticeTest.findById(req.params.id);
+  
+  if (!practiceTest) {
+    return res.status(404).json({ error: 'Practice test not found' });
+  }
+
+  // Check if there are any attempts for this test
+  const attemptCount = await PracticeTestAttempt.countDocuments({
+    practiceTestId: practiceTest._id
+  });
+
+  if (attemptCount > 0) {
+    return res.status(400).json({ 
+      error: `Cannot delete practice test. It has ${attemptCount} attempt(s). Archive it instead.` 
+    });
+  }
+
+  await PracticeTest.findByIdAndDelete(req.params.id);
+
+  res.json({
+    message: 'Practice test deleted successfully'
   });
 }));
 

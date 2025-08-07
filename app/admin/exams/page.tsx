@@ -80,38 +80,56 @@ export default function ExamManagement() {
     try {
       setLoading(true);
       
-      // Fetch exams from API
-      const response = await fetch('http://localhost:3001/api/exams');
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        setLoading(false);
+        return;
+      }
+      
+      // Fetch exams from API with authentication
+      const response = await fetch('http://localhost:3001/api/exams', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch exams');
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || 'Failed to fetch exams');
       }
       
       const data = await response.json();
+      console.log('Exams data received:', data);
       
       // Transform API data to match our interface
-      const transformedExams: Exam[] = data.exams.map((exam: any) => ({
-        id: exam._id,
-        title: exam.title,
-        examCode: exam.examCode,
-        description: exam.description,
-        subject: exam.category || 'General',
-        duration: exam.totalDuration,
-        totalMarks: exam.totalMarks,
-        startTime: exam.startTime,
-        endTime: exam.endTime,
-        status: exam.status,
-        isActive: exam.isActive,
-        maxAttempts: exam.maxAttempts,
-        passingScore: exam.passingScore,
-        totalQuestions: exam.totalQuestions || 0,
-        enrolledStudents: exam.analytics?.totalRegistrations || 0,
-        createdAt: exam.createdAt,
-        updatedAt: exam.updatedAt,
-        isPaid: exam.isPaid,
-        price: exam.price,
-        currency: exam.currency
-      }));
+      const transformedExams: Exam[] = data.exams.map((exam: any) => {
+        console.log('Processing exam:', exam._id, exam.title);
+        return {
+          id: exam._id,
+          title: exam.title,
+          examCode: exam.examCode,
+          description: exam.description,
+          subject: exam.category || 'General',
+          duration: exam.totalDuration,
+          totalMarks: exam.totalMarks,
+          startTime: exam.startTime,
+          endTime: exam.endTime,
+          status: exam.status,
+          isActive: exam.isActive,
+          maxAttempts: exam.maxAttempts,
+          passingScore: exam.passingScore,
+          totalQuestions: exam.totalQuestions || 0,
+          enrolledStudents: exam.analytics?.totalRegistrations || 0,
+          createdAt: exam.createdAt,
+          updatedAt: exam.updatedAt,
+          isPaid: exam.isPaid,
+          price: exam.price,
+          currency: exam.currency
+        };
+      });
 
       setExams(transformedExams);
       setLoading(false);
@@ -235,6 +253,50 @@ export default function ExamManagement() {
     setExams(prev => prev.map(exam => 
       exam.id === examId ? { ...exam, status: newStatus as Exam['status'] } : exam
     ));
+  };
+
+  const handleViewExam = (examId: string) => {
+    console.log('Viewing exam with ID:', examId);
+    window.open(`/admin/exams/view/${examId}`, '_blank');
+  };
+
+  const handleEditExam = (examId: string) => {
+    console.log('Editing exam with ID:', examId);
+    window.location.href = `/admin/exams/edit/${examId}`;
+  };
+
+  const handleDeleteExam = async (examId: string) => {
+    if (!confirm('Are you sure you want to delete this exam? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Authentication token not found');
+        return;
+      }
+
+      const response = await fetch(`http://localhost:3001/api/exams/${examId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete exam');
+      }
+
+      // Remove the exam from the local state
+      setExams(prev => prev.filter(exam => exam.id !== examId));
+      alert('Exam deleted successfully');
+    } catch (error) {
+      console.error('Error deleting exam:', error);
+      alert(`Error deleting exam: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   if (loading) {
@@ -459,13 +521,25 @@ export default function ExamManagement() {
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between">
                   <div className="flex space-x-2">
-                    <button className="text-blue-600 hover:text-blue-900 p-1">
+                    <button 
+                      onClick={() => handleViewExam(exam.id)}
+                      className="text-blue-600 hover:text-blue-900 p-1"
+                      title="View Exam"
+                    >
                       <EyeIcon className="h-4 w-4" />
                     </button>
-                    <button className="text-green-600 hover:text-green-900 p-1">
+                    <button 
+                      onClick={() => handleEditExam(exam.id)}
+                      className="text-green-600 hover:text-green-900 p-1"
+                      title="Edit Exam"
+                    >
                       <PencilIcon className="h-4 w-4" />
                     </button>
-                    <button className="text-red-600 hover:text-red-900 p-1">
+                    <button 
+                      onClick={() => handleDeleteExam(exam.id)}
+                      className="text-red-600 hover:text-red-900 p-1"
+                      title="Delete Exam"
+                    >
                       <TrashIcon className="h-4 w-4" />
                     </button>
                   </div>

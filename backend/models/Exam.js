@@ -127,12 +127,12 @@ const examSchema = new mongoose.Schema({
   // Scheduling
   startTime: {
     type: Date,
-    required: true,
+    required: false,
     index: true
   },
   endTime: {
     type: Date,
-    required: true,
+    required: false,
     index: true
   },
   checkInWindow: {
@@ -294,7 +294,7 @@ examSchema.methods.validateExam = function() {
     errors.push('Exam code must be at least 3 characters long');
   }
   
-  if (this.startTime >= this.endTime) {
+  if (this.startTime && this.endTime && this.startTime >= this.endTime) {
     errors.push('Start time must be before end time');
   }
   
@@ -322,9 +322,9 @@ examSchema.methods.validateExam = function() {
     totalSectionQuestions += section.questionCount;
   }
   
-  // Validate time consistency
-  if (totalSectionTime !== this.totalDuration) {
-    errors.push(`Total section time (${totalSectionTime}) must equal exam duration (${this.totalDuration})`);
+  // Validate time consistency (allow some flexibility)
+  if (Math.abs(totalSectionTime - this.totalDuration) > 5) {
+    errors.push(`Total section time (${totalSectionTime}) must be close to exam duration (${this.totalDuration})`);
   }
   
   // Validate question count

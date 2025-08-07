@@ -2,13 +2,14 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const asyncHandler = require('express-async-handler');
 const Question = require('../models/Question');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
 // @route   GET /api/questions
 // @desc    Get questions with filtering
 // @access  Private
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', authenticateToken, asyncHandler(async (req, res) => {
   const {
     examId,
     sectionId,
@@ -50,11 +51,25 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 // @route   GET /api/questions/:id
-// @desc    Get question by ID
+// @desc    Get question by ID (without correct answer for students)
 // @access  Private
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get('/:id', authenticateToken, asyncHandler(async (req, res) => {
   const question = await Question.findById(req.params.id)
     .select('-correctAnswer'); // Don't send correct answer
+
+  if (!question) {
+    return res.status(404).json({ error: 'Question not found' });
+  }
+
+  res.json({ question });
+}));
+
+// @route   GET /api/questions/:id/admin
+// @desc    Get question by ID with correct answer (admin only)
+// @access  Private (Admin only)
+router.get('/:id/admin', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  const question = await Question.findById(req.params.id)
+    .populate('createdBy', 'firstName lastName email');
 
   if (!question) {
     return res.status(404).json({ error: 'Question not found' });
@@ -67,25 +82,36 @@ router.get('/:id', asyncHandler(async (req, res) => {
 // @desc    Create a new question
 // @access  Private (Admin only)
 router.post('/', [
-  body('examId').isMongoId(),
-  body('sectionId').trim().notEmpty(),
-  body('questionNumber').isInt({ min: 1 }),
+  authenticateToken,
+  requireAdmin,
   body('questionText').trim().notEmpty(),
   body('questionType').isIn(['MCQ_Single', 'MCQ_Multiple', 'TrueFalse', 'Integer', 'Numerical']),
   body('correctAnswer').notEmpty(),
-  body('marks').isFloat({ min: 0 }),
-  body('negativeMarks').optional().isFloat({ min: 0 }),
+  body('marksPerQuestion').isFloat({ min: 0 }),
+  body('negativeMarksPerQuestion').optional().isFloat({ min: 0 }),
   body('options').optional().isArray(),
   body('explanation').optional().trim(),
-  body('difficulty').optional().isIn(['easy', 'medium', 'hard']),
+  body('difficulty').optional().isIn(['Easy', 'Medium', 'Hard']),
   body('topic').optional().trim(),
   body('subject').optional().trim(),
-  body('tags').optional().isArray()
+  body('tags').optional().isArray(),
+  body('questionImages').optional().isArray(),
+  body('optionImages').optional().isArray(),
+  body('explanationImages').optional().isArray()
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
+
+  // Generate question number if not provided
+  if (!req.body.questionNumber) {
+    const lastQuestion = await Question.findOne().sort({ questionNumber: -1 });
+    req.body.questionNumber = lastQuestion ? lastQuestion.questionNumber + 1 : 1;
+  }
+
+  // Set createdBy to current user
+  req.body.createdBy = req.user.id;
 
   const question = new Question(req.body);
   
@@ -102,14 +128,14 @@ router.post('/', [
 
   res.status(201).json({
     message: 'Question created successfully',
-    question: question.getPreview()
+    question: question
   });
 }));
 
 // @route   PUT /api/questions/:id
 // @desc    Update question
 // @access  Private (Admin only)
-router.put('/:id', [
+router.put('/:id', authenticateToken, requireAdmin, [
   body('questionText').optional().trim().notEmpty(),
   body('questionType').optional().isIn(['MCQ_Single', 'MCQ_Multiple', 'TrueFalse', 'Integer', 'Numerical']),
   body('correctAnswer').optional().notEmpty(),
@@ -155,7 +181,7 @@ router.put('/:id', [
 // @route   DELETE /api/questions/:id
 // @desc    Delete question
 // @access  Private (Admin only)
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
   const question = await Question.findById(req.params.id);
   if (!question) {
     return res.status(404).json({ error: 'Question not found' });

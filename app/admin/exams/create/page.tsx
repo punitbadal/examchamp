@@ -13,10 +13,14 @@ import {
   EyeIcon,
   EyeSlashIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import QuestionForm from '../../../components/QuestionForm';
+import ReactQuillEditor from '../../../components/ReactQuillEditor';
+import RichTextRenderer from '../../../components/RichTextRenderer';
 
 interface Question {
   id: string;
@@ -38,10 +42,14 @@ interface ExamSection {
   id: string;
   name: string;
   subject: string;
-  duration: number; // in minutes
   totalMarks: number;
   questions: Question[];
   instructions: string;
+  markingScheme: {
+    correctMarks: number;
+    incorrectMarks: number;
+    noAttemptMarks: number;
+  };
 }
 
 interface Subject {
@@ -49,6 +57,19 @@ interface Subject {
   name: string;
   code: string;
   category: string;
+}
+
+interface Category {
+  _id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  order: number;
+  isActive: boolean;
+  subjectCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Chapter {
@@ -105,6 +126,7 @@ interface ExamFormErrors {
 export default function CreateExam() {
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [formData, setFormData] = useState<ExamForm>({
@@ -138,6 +160,27 @@ export default function CreateExam() {
   const [errors, setErrors] = useState<ExamFormErrors>({});
   const [activeTab, setActiveTab] = useState<any>('basic');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
+  const [showCreateQuestionModal, setShowCreateQuestionModal] = useState(false);
+  const [newQuestionData, setNewQuestionData] = useState({
+    questionText: '',
+    questionType: 'MCQ_Single' as 'MCQ_Single' | 'MCQ_Multiple' | 'TrueFalse' | 'Integer' | 'Numerical',
+    subject: '',
+    chapter: '',
+    topic: '',
+    difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard',
+    marksPerQuestion: 4,
+    negativeMarksPerQuestion: 1,
+    options: ['', '', '', ''],
+    correctAnswer: '',
+    explanation: '',
+    questionImages: [],
+    optionImages: [],
+    explanationImages: [],
+    tags: [],
+    isActive: true
+  });
+  const [newQuestionErrors, setNewQuestionErrors] = useState<any>({});
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
 
   useEffect(() => {
     // Check if user is authenticated and is admin
@@ -158,6 +201,7 @@ export default function CreateExam() {
       
       loadQuestions();
       loadSubjects();
+      loadCategories();
     } catch (error) {
       console.error('Error parsing user data:', error);
       router.push('/');
@@ -167,33 +211,82 @@ export default function CreateExam() {
   const loadSubjects = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/subjects', {
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+      
+      const response = await fetch('/api/subjects?limit=1000', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
       if (response.ok) {
         const data = await response.json();
-        setSubjects(data.data.docs || data.data || []);
+        console.log('Subjects loaded:', data);
+        setSubjects(data.data?.docs || data.data || []);
+      } else {
+        console.error('Failed to load subjects:', response.status, response.statusText);
+        const errorData = await response.json();
+        console.error('Error details:', errorData);
       }
     } catch (error) {
       console.error('Error loading subjects:', error);
     }
   };
 
-  const loadChapters = async (subjectId: string) => {
+  const loadCategories = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/chapters?subjectId=${subjectId}`, {
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+      
+      const response = await fetch('/api/categories?limit=1000', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
       if (response.ok) {
         const data = await response.json();
-        setChapters(data.data.docs || data.data || []);
+        console.log('Categories loaded:', data);
+        setCategories(data.data?.docs || data.data || []);
+      } else {
+        console.error('Failed to load categories:', response.status, response.statusText);
+        const errorData = await response.json();
+        console.error('Error details:', errorData);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  const loadChapters = async (subjectId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+      
+      const response = await fetch(`/api/chapters?subjectId=${subjectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Chapters loaded:', data);
+        setChapters(data.data?.docs || data.data || []);
+      } else {
+        console.error('Failed to load chapters:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error loading chapters:', error);
@@ -203,15 +296,24 @@ export default function CreateExam() {
   const loadTopics = async (chapterId: string) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+      
       const response = await fetch(`/api/topics?chapterId=${chapterId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
       if (response.ok) {
         const data = await response.json();
-        setTopics(data.data.docs || data.data || []);
+        console.log('Topics loaded:', data);
+        setTopics(data.data?.docs || data.data || []);
+      } else {
+        console.error('Failed to load topics:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error loading topics:', error);
@@ -293,6 +395,14 @@ export default function CreateExam() {
     }
   };
 
+  const updateExamTotalMarks = () => {
+    const totalSectionMarks = formData.sections.reduce((sum, section) => sum + section.totalMarks, 0);
+    setFormData(prev => ({
+      ...prev,
+      totalMarks: totalSectionMarks
+    }));
+  };
+
   const handleExamTypeChange = (examType: 'live' | 'practice' | 'mock') => {
     setFormData(prev => ({
       ...prev,
@@ -317,9 +427,9 @@ export default function CreateExam() {
         maxAttempts: 1,
         passingScore: 150,
         sections: [
-          { id: '1', name: 'Physics', subject: 'Physics', duration: 60, totalMarks: 100, questions: [], instructions: 'Physics section with 25 questions (4 marks each)' },
-          { id: '2', name: 'Chemistry', subject: 'Chemistry', duration: 60, totalMarks: 100, questions: [], instructions: 'Chemistry section with 25 questions (4 marks each)' },
-          { id: '3', name: 'Mathematics', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Mathematics section with 25 questions (4 marks each)' }
+          { id: '1', name: 'Physics', subject: 'Physics', totalMarks: 100, questions: [], instructions: 'Physics section with 25 questions (4 marks each)', markingScheme: { correctMarks: 4, incorrectMarks: -1, noAttemptMarks: 0 } },
+          { id: '2', name: 'Chemistry', subject: 'Chemistry', totalMarks: 100, questions: [], instructions: 'Chemistry section with 25 questions (4 marks each)', markingScheme: { correctMarks: 4, incorrectMarks: -1, noAttemptMarks: 0 } },
+          { id: '3', name: 'Mathematics', subject: 'Mathematics', totalMarks: 100, questions: [], instructions: 'Mathematics section with 25 questions (4 marks each)', markingScheme: { correctMarks: 4, incorrectMarks: -1, noAttemptMarks: 0 } }
         ]
       },
       neet: {
@@ -331,9 +441,9 @@ export default function CreateExam() {
         maxAttempts: 1,
         passingScore: 360,
         sections: [
-          { id: '1', name: 'Physics', subject: 'Physics', duration: 50, totalMarks: 180, questions: [], instructions: 'Physics section with 45 questions (4 marks each)' },
-          { id: '2', name: 'Chemistry', subject: 'Chemistry', duration: 50, totalMarks: 180, questions: [], instructions: 'Chemistry section with 45 questions (4 marks each)' },
-          { id: '3', name: 'Biology', subject: 'Biology', duration: 100, totalMarks: 360, questions: [], instructions: 'Biology section with 90 questions (4 marks each)' }
+          { id: '1', name: 'Physics', subject: 'Physics', totalMarks: 180, questions: [], instructions: 'Physics section with 45 questions (4 marks each)', markingScheme: { correctMarks: 4, incorrectMarks: -1, noAttemptMarks: 0 } },
+          { id: '2', name: 'Chemistry', subject: 'Chemistry', totalMarks: 180, questions: [], instructions: 'Chemistry section with 45 questions (4 marks each)', markingScheme: { correctMarks: 4, incorrectMarks: -1, noAttemptMarks: 0 } },
+          { id: '3', name: 'Biology', subject: 'Biology', totalMarks: 360, questions: [], instructions: 'Biology section with 90 questions (4 marks each)', markingScheme: { correctMarks: 4, incorrectMarks: -1, noAttemptMarks: 0 } }
         ]
       },
       cat: {
@@ -345,9 +455,9 @@ export default function CreateExam() {
         maxAttempts: 1,
         passingScore: 150,
         sections: [
-          { id: '1', name: 'Verbal Ability', subject: 'English', duration: 60, totalMarks: 100, questions: [], instructions: 'Verbal Ability section with 34 questions' },
-          { id: '2', name: 'Data Interpretation', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Data Interpretation section with 32 questions' },
-          { id: '3', name: 'Quantitative Aptitude', subject: 'Mathematics', duration: 60, totalMarks: 100, questions: [], instructions: 'Quantitative Aptitude section with 34 questions' }
+          { id: '1', name: 'Verbal Ability', subject: 'English', totalMarks: 100, questions: [], instructions: 'Verbal Ability section with 34 questions', markingScheme: { correctMarks: 3, incorrectMarks: -1, noAttemptMarks: 0 } },
+          { id: '2', name: 'Data Interpretation', subject: 'Mathematics', totalMarks: 100, questions: [], instructions: 'Data Interpretation section with 32 questions', markingScheme: { correctMarks: 3, incorrectMarks: -1, noAttemptMarks: 0 } },
+          { id: '3', name: 'Quantitative Aptitude', subject: 'Mathematics', totalMarks: 100, questions: [], instructions: 'Quantitative Aptitude section with 34 questions', markingScheme: { correctMarks: 3, incorrectMarks: -1, noAttemptMarks: 0 } }
         ]
       },
       upsc: {
@@ -359,7 +469,7 @@ export default function CreateExam() {
         maxAttempts: 1,
         passingScore: 100,
         sections: [
-          { id: '1', name: 'General Studies', subject: 'General Knowledge', duration: 120, totalMarks: 200, questions: [], instructions: 'General Studies section with 100 questions (2 marks each)' }
+          { id: '1', name: 'General Studies', subject: 'General Knowledge', totalMarks: 200, questions: [], instructions: 'General Studies section with 100 questions (2 marks each)', markingScheme: { correctMarks: 2, incorrectMarks: -0.66, noAttemptMarks: 0 } }
         ]
       },
       gate: {
@@ -371,8 +481,8 @@ export default function CreateExam() {
         maxAttempts: 1,
         passingScore: 50,
         sections: [
-          { id: '1', name: 'General Aptitude', subject: 'English', duration: 30, totalMarks: 15, questions: [], instructions: 'General Aptitude section with 10 questions' },
-          { id: '2', name: 'Core Subject', subject: 'Engineering', duration: 150, totalMarks: 85, questions: [], instructions: 'Core subject section with 55 questions' }
+          { id: '1', name: 'General Aptitude', subject: 'English', totalMarks: 15, questions: [], instructions: 'General Aptitude section with 10 questions', markingScheme: { correctMarks: 1, incorrectMarks: -0.33, noAttemptMarks: 0 } },
+          { id: '2', name: 'Core Subject', subject: 'Engineering', totalMarks: 85, questions: [], instructions: 'Core subject section with 55 questions', markingScheme: { correctMarks: 1, incorrectMarks: -0.33, noAttemptMarks: 0 } }
         ]
       },
       gre: {
@@ -384,10 +494,10 @@ export default function CreateExam() {
         maxAttempts: 1,
         passingScore: 170,
         sections: [
-          { id: '1', name: 'Verbal Reasoning', subject: 'English', duration: 30, totalMarks: 170, questions: [], instructions: 'Verbal Reasoning section with 20 questions' },
-          { id: '2', name: 'Quantitative Reasoning', subject: 'Mathematics', duration: 35, totalMarks: 170, questions: [], instructions: 'Quantitative Reasoning section with 20 questions' },
-          { id: '3', name: 'Analytical Writing', subject: 'English', duration: 60, totalMarks: 6, questions: [], instructions: 'Analytical Writing section with 2 essays' },
-          { id: '4', name: 'Research Section', subject: 'Mixed', duration: 80, totalMarks: 0, questions: [], instructions: 'Research section (unscored)' }
+          { id: '1', name: 'Verbal Reasoning', subject: 'English', totalMarks: 170, questions: [], instructions: 'Verbal Reasoning section with 20 questions', markingScheme: { correctMarks: 8.5, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '2', name: 'Quantitative Reasoning', subject: 'Mathematics', totalMarks: 170, questions: [], instructions: 'Quantitative Reasoning section with 20 questions', markingScheme: { correctMarks: 8.5, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '3', name: 'Analytical Writing', subject: 'English', totalMarks: 6, questions: [], instructions: 'Analytical Writing section with 2 essays', markingScheme: { correctMarks: 6, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '4', name: 'Research Section', subject: 'Mixed', totalMarks: 0, questions: [], instructions: 'Research section (unscored)', markingScheme: { correctMarks: 0, incorrectMarks: 0, noAttemptMarks: 0 } }
         ]
       },
       ielts: {
@@ -399,10 +509,10 @@ export default function CreateExam() {
         maxAttempts: 1,
         passingScore: 6,
         sections: [
-          { id: '1', name: 'Listening', subject: 'English', duration: 30, totalMarks: 9, questions: [], instructions: 'Listening section with 40 questions' },
-          { id: '2', name: 'Reading', subject: 'English', duration: 60, totalMarks: 9, questions: [], instructions: 'Reading section with 40 questions' },
-          { id: '3', name: 'Writing', subject: 'English', duration: 60, totalMarks: 9, questions: [], instructions: 'Writing section with 2 tasks' },
-          { id: '4', name: 'Speaking', subject: 'English', duration: 15, totalMarks: 9, questions: [], instructions: 'Speaking section with 3 parts' }
+          { id: '1', name: 'Listening', subject: 'English', totalMarks: 9, questions: [], instructions: 'Listening section with 40 questions', markingScheme: { correctMarks: 9, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '2', name: 'Reading', subject: 'English', totalMarks: 9, questions: [], instructions: 'Reading section with 40 questions', markingScheme: { correctMarks: 9, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '3', name: 'Writing', subject: 'English', totalMarks: 9, questions: [], instructions: 'Writing section with 2 tasks', markingScheme: { correctMarks: 9, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '4', name: 'Speaking', subject: 'English', totalMarks: 9, questions: [], instructions: 'Speaking section with 3 parts', markingScheme: { correctMarks: 9, incorrectMarks: 0, noAttemptMarks: 0 } }
         ]
       },
       toefl: {
@@ -414,10 +524,10 @@ export default function CreateExam() {
         maxAttempts: 1,
         passingScore: 80,
         sections: [
-          { id: '1', name: 'Reading', subject: 'English', duration: 54, totalMarks: 30, questions: [], instructions: 'Reading section with 30 questions' },
-          { id: '2', name: 'Listening', subject: 'English', duration: 41, totalMarks: 30, questions: [], instructions: 'Listening section with 28 questions' },
-          { id: '3', name: 'Speaking', subject: 'English', duration: 17, totalMarks: 30, questions: [], instructions: 'Speaking section with 4 tasks' },
-          { id: '4', name: 'Writing', subject: 'English', duration: 50, totalMarks: 30, questions: [], instructions: 'Writing section with 2 tasks' }
+          { id: '1', name: 'Reading', subject: 'English', totalMarks: 30, questions: [], instructions: 'Reading section with 30 questions', markingScheme: { correctMarks: 30, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '2', name: 'Listening', subject: 'English', totalMarks: 30, questions: [], instructions: 'Listening section with 28 questions', markingScheme: { correctMarks: 30, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '3', name: 'Speaking', subject: 'English', totalMarks: 30, questions: [], instructions: 'Speaking section with 4 tasks', markingScheme: { correctMarks: 30, incorrectMarks: 0, noAttemptMarks: 0 } },
+          { id: '4', name: 'Writing', subject: 'English', totalMarks: 30, questions: [], instructions: 'Writing section with 2 tasks', markingScheme: { correctMarks: 30, incorrectMarks: 0, noAttemptMarks: 0 } }
         ]
       }
     };
@@ -444,10 +554,14 @@ export default function CreateExam() {
       id: Date.now().toString(),
       name: `Section ${formData.sections.length + 1}`,
       subject: '',
-      duration: 30,
       totalMarks: 100,
       questions: [],
-      instructions: ''
+      instructions: '',
+      markingScheme: {
+        correctMarks: 4,
+        incorrectMarks: -1,
+        noAttemptMarks: 0
+      }
     };
     setFormData(prev => ({
       ...prev,
@@ -472,25 +586,121 @@ export default function CreateExam() {
   };
 
   const addQuestionToSection = (sectionId: string, question: Question) => {
-    setFormData(prev => ({
-      ...prev,
-      sections: prev.sections.map(section =>
+    setFormData(prev => {
+      const updatedSections = prev.sections.map(section =>
         section.id === sectionId
-          ? { ...section, questions: [...section.questions, question] }
+          ? { 
+              ...section, 
+              questions: [...section.questions, question],
+              totalMarks: [...section.questions, question].reduce((sum, q) => sum + q.marks, 0)
+            }
           : section
-      )
-    }));
+      );
+      
+      const totalSectionMarks = updatedSections.reduce((sum, section) => sum + section.totalMarks, 0);
+      
+      return {
+        ...prev,
+        sections: updatedSections,
+        totalMarks: totalSectionMarks
+      };
+    });
   };
 
   const removeQuestionFromSection = (sectionId: string, questionId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      sections: prev.sections.map(section =>
+    setFormData(prev => {
+      const updatedSections = prev.sections.map(section =>
         section.id === sectionId
-          ? { ...section, questions: section.questions.filter(q => q.id !== questionId) }
+          ? { 
+              ...section, 
+              questions: section.questions.filter(q => q.id !== questionId),
+              totalMarks: section.questions.filter(q => q.id !== questionId).reduce((sum, q) => sum + q.marks, 0)
+            }
           : section
-      )
-    }));
+      );
+      
+      const totalSectionMarks = updatedSections.reduce((sum, section) => sum + section.totalMarks, 0);
+      
+      return {
+        ...prev,
+        sections: updatedSections,
+        totalMarks: totalSectionMarks
+      };
+    });
+  };
+
+  const handleCreateQuestion = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('/api/questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newQuestionData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create question');
+      }
+
+      const result = await response.json();
+      
+      // Add the newly created question to the selected section
+      if (selectedSectionId) {
+        const newQuestion: Question = {
+          id: result.question._id,
+          questionText: newQuestionData.questionText,
+          questionType: newQuestionData.questionType === 'MCQ_Single' || newQuestionData.questionType === 'MCQ_Multiple' ? 'mcq' : 'numerical',
+          subject: newQuestionData.subject,
+          chapter: newQuestionData.chapter,
+          topic: newQuestionData.topic,
+          difficulty: newQuestionData.difficulty.toLowerCase() as 'easy' | 'medium' | 'hard',
+          marks: newQuestionData.marksPerQuestion,
+          negativeMarks: newQuestionData.negativeMarksPerQuestion,
+          options: newQuestionData.options,
+          correctAnswer: newQuestionData.correctAnswer,
+          explanation: newQuestionData.explanation,
+          tags: newQuestionData.tags
+        };
+
+        addQuestionToSection(selectedSectionId, newQuestion);
+      }
+
+      // Reset form and close modal
+      setNewQuestionData({
+        questionText: '',
+        questionType: 'MCQ_Single',
+        subject: '',
+        chapter: '',
+        topic: '',
+        difficulty: 'Medium',
+        marksPerQuestion: 4,
+        negativeMarksPerQuestion: 1,
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        explanation: '',
+        questionImages: [],
+        optionImages: [],
+        explanationImages: [],
+        tags: [],
+        isActive: true
+      });
+      setNewQuestionErrors({});
+      setShowCreateQuestionModal(false);
+
+      // Reload questions to include the new one
+      loadQuestions();
+    } catch (error) {
+      console.error('Error creating question:', error);
+      alert(`Error creating question: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const validateForm = (): boolean => {
@@ -521,14 +731,9 @@ export default function CreateExam() {
     }
 
     // Validate section totals match exam totals
-    const totalSectionDuration = formData.sections.reduce((sum, section) => sum + section.duration, 0);
     const totalSectionMarks = formData.sections.reduce((sum, section) => sum + section.totalMarks, 0);
 
-    if (totalSectionDuration !== formData.totalDuration) {
-      newErrors.totalDuration = `Section durations (${totalSectionDuration} min) must equal exam duration (${formData.totalDuration} min)`;
-    }
-
-    if (totalSectionMarks !== formData.totalMarks) {
+    if (Math.abs(totalSectionMarks - formData.totalMarks) > 0.01) {
       newErrors.totalMarks = `Section marks (${totalSectionMarks}) must equal exam marks (${formData.totalMarks})`;
     }
 
@@ -574,11 +779,12 @@ export default function CreateExam() {
           name: section.name,
           description: section.instructions,
           questionCount: section.questions.length,
-          timeLimit: section.duration,
+          timeLimit: Math.floor(formData.totalDuration / formData.sections.length), // Distribute time evenly
           marksPerQuestion: section.questions.length > 0 ? section.totalMarks / section.questions.length : 0,
           subjects: [section.subject],
           topics: section.questions.map(q => q.topic).filter(Boolean),
-          instructions: section.instructions
+          instructions: section.instructions,
+          markingScheme: section.markingScheme
         })),
         settings: {
           showTimer: true,
@@ -607,10 +813,16 @@ export default function CreateExam() {
       };
 
       // Make API call to create exam
-      const response = await fetch('http://localhost:3001/api/exams', {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+      
+      const response = await fetch('/api/exams', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(examData)
       });
@@ -642,7 +854,7 @@ export default function CreateExam() {
 
   const totalSelectedQuestions = formData.sections.reduce((total, section) => total + section.questions.length, 0);
   const totalSelectedMarks = formData.sections.reduce((total, section) => total + section.questions.reduce((sum, q) => sum + q.marks, 0), 0);
-  const totalSectionDuration = formData.sections.reduce((total, section) => total + section.duration, 0);
+  const totalSectionDuration = Math.floor(formData.totalDuration / formData.sections.length) * formData.sections.length;
 
   // Filter questions by selected section's subject
   const filteredQuestions = selectedSectionId 
@@ -1060,6 +1272,45 @@ export default function CreateExam() {
               </div>
             )}
 
+            {/* Subjects Tab */}
+            {activeTab === 'subjects' && (
+              <div className="space-y-6">
+                <h3 className="text-lg font-medium text-gray-900">Select Subjects</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Choose the subjects that will be included in this exam. You can create sections for each selected subject.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {subjects.map((subject) => (
+                    <div key={subject._id} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`subject-${subject._id}`}
+                        checked={selectedSubjects.includes(subject._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedSubjects([...selectedSubjects, subject._id]);
+                          } else {
+                            setSelectedSubjects(selectedSubjects.filter(id => id !== subject._id));
+                          }
+                        }}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor={`subject-${subject._id}`} className="ml-2 text-sm font-medium text-gray-900">
+                        {subject.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                
+                {selectedSubjects.length === 0 && (
+                  <p className="text-sm text-gray-500 italic">
+                    Please select at least one subject to continue.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Sections Tab */}
             {activeTab === 'sections' && (
               <div className="space-y-6">
@@ -1068,12 +1319,19 @@ export default function CreateExam() {
                   <button
                     type="button"
                     onClick={addSection}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                    disabled={selectedSubjects.length === 0}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
                   >
                     <PlusIcon className="h-4 w-4 mr-2" />
                     Add Section
                   </button>
                 </div>
+                
+                {selectedSubjects.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">Please select subjects in the previous tab to create sections.</p>
+                  </div>
+                )}
 
                 {formData.sections.map((section, index) => (
                   <div key={section.id} className="border border-gray-200 rounded-lg p-4">
@@ -1098,40 +1356,28 @@ export default function CreateExam() {
                           value={section.name}
                           onChange={(e) => updateSection(section.id, { name: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="e.g., Physics, Chemistry"
+                          placeholder="e.g., Physics Section 1"
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Subject
+                          Category
                         </label>
                         <select
                           value={section.subject}
                           onChange={(e) => updateSection(section.id, { subject: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                         >
-                          <option value="">Select Subject</option>
-                          <option value="Physics">Physics</option>
-                          <option value="Chemistry">Chemistry</option>
-                          <option value="Mathematics">Mathematics</option>
-                          <option value="Biology">Biology</option>
-                          <option value="English">English</option>
-                          <option value="General Knowledge">General Knowledge</option>
+                          <option value="">Select Category</option>
+                          {categories
+                            .filter(category => category.isActive)
+                            .map(category => (
+                              <option key={category._id} value={category.name}>
+                                {category.name}
+                              </option>
+                            ))}
                         </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Duration (minutes)
-                        </label>
-                        <input
-                          type="number"
-                          value={section.duration}
-                          onChange={(e) => updateSection(section.id, { duration: parseInt(e.target.value) })}
-                          min="1"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        />
                       </div>
 
                       <div>
@@ -1145,6 +1391,62 @@ export default function CreateExam() {
                           min="1"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                         />
+                      </div>
+                    </div>
+
+                    {/* Marking Scheme */}
+                    <div className="mt-4">
+                      <h5 className="text-sm font-medium text-gray-900 mb-3">Marking Scheme</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Correct Answer Marks
+                          </label>
+                          <input
+                            type="number"
+                            value={section.markingScheme.correctMarks}
+                            onChange={(e) => updateSection(section.id, { 
+                              markingScheme: { 
+                                ...section.markingScheme, 
+                                correctMarks: parseInt(e.target.value) 
+                              } 
+                            })}
+                            min="0"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Incorrect Answer Marks
+                          </label>
+                          <input
+                            type="number"
+                            value={section.markingScheme.incorrectMarks}
+                            onChange={(e) => updateSection(section.id, { 
+                              markingScheme: { 
+                                ...section.markingScheme, 
+                                incorrectMarks: parseInt(e.target.value) 
+                              } 
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            No Attempt Marks
+                          </label>
+                          <input
+                            type="number"
+                            value={section.markingScheme.noAttemptMarks}
+                            onChange={(e) => updateSection(section.id, { 
+                              markingScheme: { 
+                                ...section.markingScheme, 
+                                noAttemptMarks: parseInt(e.target.value) 
+                              } 
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -1211,9 +1513,19 @@ export default function CreateExam() {
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Available Questions */}
                         <div>
-                          <h4 className="text-md font-medium text-gray-900 mb-4">
-                            Available Questions for {formData.sections.find(s => s.id === selectedSectionId)?.name}
-                          </h4>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-md font-medium text-gray-900">
+                              Available Questions for {formData.sections.find(s => s.id === selectedSectionId)?.name}
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => setShowCreateQuestionModal(true)}
+                              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                              Create Question
+                            </button>
+                          </div>
                           <div className="space-y-2 max-h-96 overflow-y-auto">
                             {filteredQuestions.map((question) => (
                               <div
@@ -1682,7 +1994,7 @@ export default function CreateExam() {
               <button
                 type="button"
                 onClick={() => {
-                  const tabs = ['basic', 'sections', 'questions', 'settings', 'proctoring'];
+                  const tabs = ['basic', 'subjects', 'sections', 'questions', 'settings', 'proctoring'];
                   const currentIndex = tabs.indexOf(activeTab);
                   if (currentIndex > 0) {
                     setActiveTab(tabs[currentIndex - 1] as any);
@@ -1698,7 +2010,7 @@ export default function CreateExam() {
                 <button
                   type="button"
                   onClick={() => {
-                    const tabs = ['basic', 'sections', 'questions', 'settings', 'proctoring'];
+                    const tabs = ['basic', 'subjects', 'sections', 'questions', 'settings', 'proctoring'];
                     const currentIndex = tabs.indexOf(activeTab);
                     if (currentIndex < tabs.length - 1) {
                       setActiveTab(tabs[currentIndex + 1] as any);
@@ -1723,6 +2035,51 @@ export default function CreateExam() {
             </div>
           </form>
         </motion.div>
+
+        {/* Create Question Modal */}
+        {showCreateQuestionModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">Create New Question</h2>
+                <button
+                  onClick={() => setShowCreateQuestionModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="p-6">
+                <QuestionForm
+                  formData={newQuestionData}
+                  setFormData={setNewQuestionData}
+                  errors={newQuestionErrors}
+                  setErrors={setNewQuestionErrors}
+                  loading={loading}
+                />
+              </div>
+              
+              <div className="flex justify-end gap-4 p-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateQuestionModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateQuestion}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? 'Creating...' : 'Create Question'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,31 +1,7 @@
 version: '3.8'
 
 services:
-  # MongoDB Database
-  mongodb:
-    image: mongo:6.0
-    container_name: examtech-mongodb
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password123}
-      MONGO_INITDB_DATABASE: examtech
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-      - ./backend/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
-      - ./logs/mongodb:/var/log/mongodb
-    networks:
-      - examtech-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-  # Redis for caching and sessions (Optional)
+  # Redis for caching and sessions
   redis:
     image: redis:7-alpine
     container_name: examtech-redis
@@ -54,8 +30,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - MONGODB_URI=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017/examtech?authSource=admin
-      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      - MONGODB_URI=mongodb+srv://punitmnitjaipur:ECHZ46jTQUxUI3B9@prod.ppegomw.mongodb.net/examtech?retryWrites=true&w=majority&appName=prod
+      - JWT_SECRET=${JWT_SECRET:-examtech-super-secret-jwt-key-change-in-production-2024}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redispassword}@redis:6379
       - LOG_LEVEL=info
@@ -73,11 +49,15 @@ services:
       - MONGODB_CONNECTION_POOL_SIZE=10
       - MONGODB_SOCKET_TIMEOUT_MS=45000
       - MONGODB_SERVER_SELECTION_TIMEOUT_MS=30000
+      # Firebase Admin SDK Configuration
+      - FIREBASE_PRIVATE_KEY_ID=68a5e1c6e159a5aa2cb7914c716b86776901bee7
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY:-"-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDmM2CjHQ9iq5H5\nV+ZrPtCw+7HDlt4z10wQ557XBabg+XOcqrkQ4z5XetdO7ZAtzXpJpD+4e/6KVm+E\nF2BLQJ40yt2rkJeGS6jltepbvfmbzMjZWuFGvxeNgmGf+ODnPfHs2ET15eH6VHSE\nyLRtN442adS0IZJ5SAS6gFmh1/n0wmUzg2JVAYRkEVEfVkIwZdU9+e2dqCMDgZ67\nqhL0Y8ESyjmyEnX9c3d7gBQWVFVUdn9zsed2xzwn4Ohsru9fu7dMpCWIguy50cbr\nSW/o+AqcieDlnCnj2WZyTTKXQ6q5z1xnKabbgNLuldqEiMXZDjMTJjXsYRRDFQGJ\ncJWLnRSDAgMBAAECggEAJbFl8m9wtHxZY5WUAh1/+GrOGbObYKuxJdd3N8gSIiZW\nWuHNeclrzNEtbhwSDp3llydQ07lh3W73xY46Uzgab5SEJXKAjRnYZvyZijoaI/ut\nK4Ho/zeM+LvPlm0fDl4jPd/Pst/YV6/6gD+I45VEMP61OGWC4V78fzlC8/A0WnIm\npyYedm9xowdxEU+wh9qCDQrxJVgrpQsQNyt3i9ACQbInN95BE4Ff4VIBG71GiQ/g\niOYPGf/iBGtjecUfU0GLzlt+JWfup8q/M0TQ1qzf2fpkLG59441/XhU97xA77E6o\nlb1qthEgHgWo+sYUeihMOo4YpyIsb8L3GvkbX3MJaQKBgQD8Q7BauZGRj9zMO/E3\nl5n1cvQeDbL2KIPKAnAoOOaJYJbSegJurl1+8A2I8YbH7hkxMFWO9L6jS8WqhdDP\nQNI0HkVrwHupVkmNDnEvywoVuet14degH1EoUFmYtKFLb3mICPQTVGArE02pgwS7\n5jg5VhQ+MxL3oWaH1NvcVyQjNwKBgQDpnAwOG07uEf2Zmexz1kvpiX139LHOSOE4\nprix8roGcLS6sOgMCcXmimaInwI4WEFzjjsdOV5Dlz97U9odiQb5JuVbjVcn6cLL\nAL9wAh7A7hyW4+2D7AE+Kp7jPE4vLvt3FMGZ1pKEPGG3qdG7dM8w8fOR7J+vqIri\noEY6hAXXFQKBgD11xF6mPXgIY9QCeqd/sQvi4OT9k29zuYAbDfZOvqQTu0s2XKdY\npgDKPZHyvlKxiMO6Me4tZNDmIheEmLYV5eC6y1EQSVCdbDgIn7z0K9XVQS+sQVuK\npbw7r0iMIYv+cc6Z19VpxjBYeKBnAl1BHsuhVDc/PEzGrvNDAfnx5SULAoGAZ/MC\nAjzwkEr9F55AcwMGYHLHm9sMS4huf3Dgen5RfJAmO3SArOqkXwNywJRQvpW2+h5t\n+4ENivIAU3Zqdf4FVlSSdnycLax8+yvoA4VN/fd2TUY66BraKrl4XhD1kVVMnB5m\nT3gFVkYwDTPJmapOj675/RLXs6hBtLowxdT9bEkCgYBJqfVkk3iTroU5l1IxgjLi\nJ+TzgQXMgUBTIrkByVGXS0YC550RCuAxB7Jwui5cnnHuUdA8JF1pnFiTS52+qUyT\nKDHq9EDTRif4HaRft5UmjSTzBgXPTDGwJ9WSQeBrqWDzOobtac/S9hF+ibeVuWbU\ndqLZNVkhZGoPsnGliJwmQg==\n-----END PRIVATE KEY-----\n"}
+      - FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@prepexam-59b8f.iam.gserviceaccount.com
+      - FIREBASE_CLIENT_ID=105091485518245622559
+      - FIREBASE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40prepexam-59b8f.iam.gserviceaccount.com
     ports:
       - "3001:3001"
     depends_on:
-      mongodb:
-        condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
@@ -111,6 +91,14 @@ services:
       - NEXT_PUBLIC_CONTENT_SECURITY_POLICY=true
       - NEXT_PUBLIC_ENABLE_CACHING=true
       - NEXT_PUBLIC_ENABLE_COMPRESSION=true
+      # Firebase Configuration (Public)
+      - NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCeQmi_mSX82uK1ogUyJBQQZNnGp2uxgDE
+      - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=prepexam-59b8f.firebaseapp.com
+      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=prepexam-59b8f
+      - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=prepexam-59b8f.firebasestorage.app
+      - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=276771591390
+      - NEXT_PUBLIC_FIREBASE_APP_ID=1:276771591390:web:a5323787d7821a6ad61e4f
+      - NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-XRH22M5CKC
     ports:
       - "3000:3000"
     depends_on:
@@ -188,8 +176,6 @@ services:
       - examtech-network
 
 volumes:
-  mongodb_data:
-    driver: local
   redis_data:
     driver: local
   prometheus_data:

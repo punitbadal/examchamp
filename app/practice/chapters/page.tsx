@@ -92,7 +92,7 @@ export default function ChapterPracticeTestsPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/subjects', {
+      const response = await fetch('/api/subjects?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

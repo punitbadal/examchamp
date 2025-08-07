@@ -23,7 +23,6 @@ const subjectSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Science', 'Mathematics', 'Engineering', 'Medical', 'Commerce', 'Arts', 'General'],
     required: true,
     index: true
   },

@@ -21,6 +21,26 @@ const questionSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  // New fields for rich content and images
+  questionImages: [{
+    url: String,
+    key: String,
+    caption: String,
+    alt: String
+  }],
+  optionImages: [{
+    optionIndex: Number,
+    url: String,
+    key: String,
+    caption: String,
+    alt: String
+  }],
+  explanationImages: [{
+    url: String,
+    key: String,
+    caption: String,
+    alt: String
+  }],
   correctAnswer: {
     type: mongoose.Schema.Types.Mixed, // Can be string, array, number, or boolean
     required: true

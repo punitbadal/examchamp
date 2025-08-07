@@ -89,8 +89,7 @@ router.post('/', [
   authorize('admin', 'super_admin'),
   body('name').notEmpty().withMessage('Subject name is required'),
   body('code').notEmpty().withMessage('Subject code is required'),
-  body('category').isIn(['Science', 'Mathematics', 'Engineering', 'Medical', 'Commerce', 'Arts', 'General'])
-    .withMessage('Valid category is required'),
+  body('category').notEmpty().withMessage('Category is required'),
   body('difficulty').optional().isIn(['Beginner', 'Intermediate', 'Advanced']),
   body('description').optional().isString(),
   body('icon').optional().isString(),
@@ -158,7 +157,7 @@ router.put('/:id', [
   authorize('admin', 'super_admin'),
   body('name').optional().notEmpty().withMessage('Subject name cannot be empty'),
   body('code').optional().notEmpty().withMessage('Subject code cannot be empty'),
-  body('category').optional().isIn(['Science', 'Mathematics', 'Engineering', 'Medical', 'Commerce', 'Arts', 'General']),
+  body('category').optional().notEmpty().withMessage('Category cannot be empty'),
   body('difficulty').optional().isIn(['Beginner', 'Intermediate', 'Advanced']),
   body('description').optional().isString(),
   body('icon').optional().isString(),
@@ -167,8 +166,13 @@ router.put('/:id', [
   body('isActive').optional().isBoolean(),
   body('tags').optional().isArray()
 ], asyncHandler(async (req, res) => {
+  console.log('PUT /api/subjects/:id - Request received');
+  console.log('User:', req.user);
+  console.log('Request body:', req.body);
+  console.log('Subject ID:', req.params.id);
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log('Validation errors:', errors.array());
     return res.status(400).json({
       success: false,
       errors: errors.array()

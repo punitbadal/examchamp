@@ -656,7 +656,7 @@ export default function TopicsPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/topics', {
+      const response = await fetch('/api/topics?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -678,7 +678,7 @@ export default function TopicsPage() {
   const loadSubjects = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/subjects', {
+      const response = await fetch('/api/subjects?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -696,7 +696,7 @@ export default function TopicsPage() {
   const loadChapters = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/chapters', {
+      const response = await fetch('/api/chapters?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -12,12 +12,16 @@ const studyMaterialSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['pdf', 'video', 'article', 'presentation', 'formula_sheet', 'notes', 'previous_papers'],
+    enum: ['document', 'video', 'image', 'link', 'presentation', 'pdf', 'article', 'formula_sheet', 'notes', 'previous_papers'],
     required: true
   },
   subject: {
     type: String,
     required: true,
+    trim: true
+  },
+  topic: {
+    type: String,
     trim: true
   },
   category: {
@@ -41,6 +45,10 @@ const studyMaterialSchema = new mongoose.Schema({
   fileSize: {
     type: Number, // in bytes
     default: 0
+  },
+  url: {
+    type: String,
+    trim: true
   },
   // Video specific fields
   duration: {

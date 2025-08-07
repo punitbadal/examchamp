@@ -262,7 +262,7 @@ const practiceTestSchema = new mongoose.Schema({
     },
     difficultyRating: {
       type: Number,
-      default: 0,
+      default: 1,
       min: 1,
       max: 5
     },

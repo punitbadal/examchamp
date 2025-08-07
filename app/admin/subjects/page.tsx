@@ -435,7 +435,7 @@ export default function SubjectsPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/subjects', {
+      const response = await fetch('/api/subjects?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -457,7 +457,7 @@ export default function SubjectsPage() {
   const loadCategories = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/categories', {
+      const response = await fetch('/api/categories?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -481,6 +481,11 @@ export default function SubjectsPage() {
       const url = editingSubject ? `/api/subjects/${editingSubject._id}` : '/api/subjects';
       const method = editingSubject ? 'PUT' : 'POST';
 
+      console.log('Sending subject data:', formData);
+      console.log('Token available:', !!token);
+      console.log('Request URL:', url);
+      console.log('Request method:', method);
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -490,13 +495,26 @@ export default function SubjectsPage() {
         body: JSON.stringify(formData)
       });
 
+      console.log('Response status:', response.status);
+
       if (response.ok) {
         setModalOpen(false);
         setEditingSubject(null);
         loadSubjects();
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to save subject');
+        console.error('Subject save error:', error);
+        
+        // Handle validation errors
+        if (error.details && Array.isArray(error.details)) {
+          const errorMessages = error.details.map((err: any) => err.msg).join('\n');
+          alert(`Validation errors:\n${errorMessages}`);
+        } else if (error.errors && Array.isArray(error.errors)) {
+          const errorMessages = error.errors.map((err: any) => err.msg).join('\n');
+          alert(`Validation errors:\n${errorMessages}`);
+        } else {
+          alert(error.message || error.error || 'Failed to save subject');
+        }
       }
     } catch (error) {
       console.error('Error saving subject:', error);

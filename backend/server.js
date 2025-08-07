@@ -40,30 +40,53 @@ const io = socketIo(server, {
   pingInterval: 25000
 });
 
-// MongoDB connection with production settings
+// MongoDB connection with production settings and retry logic
 const mongoOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   maxPoolSize: parseInt(process.env.MONGODB_CONNECTION_POOL_SIZE) || 10,
   serverSelectionTimeoutMS: parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS) || 30000,
   socketTimeoutMS: parseInt(process.env.MONGODB_SOCKET_TIMEOUT_MS) || 45000,
-  bufferCommands: false
+  bufferCommands: false,
+  retryWrites: true,
+  retryReads: true,
+  maxIdleTimeMS: 30000,
+  connectTimeoutMS: 10000,
+  heartbeatFrequencyMS: 10000
 };
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/examtech', mongoOptions)
-.then(() => {
-  logger.database('Connected to MongoDB', {
-    host: mongoose.connection.host,
-    port: mongoose.connection.port,
-    database: mongoose.connection.name
-  });
-})
-.catch(err => {
-  logger.error('MongoDB connection error', {
-    error: err.message,
-    stack: err.stack
-  });
-  process.exit(1);
+const connectWithRetry = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/examtech', mongoOptions);
+    logger.database('Connected to MongoDB', {
+      host: mongoose.connection.host,
+      port: mongoose.connection.port,
+      database: mongoose.connection.name
+    });
+  } catch (err) {
+    logger.error('MongoDB connection error', {
+      error: err.message,
+      stack: err.stack
+    });
+    // Retry after 5 seconds
+    setTimeout(connectWithRetry, 5000);
+  }
+};
+
+connectWithRetry();
+
+// Handle connection events
+mongoose.connection.on('error', (err) => {
+  logger.error('MongoDB connection error', { error: err.message });
+});
+
+mongoose.connection.on('disconnected', () => {
+  logger.warn('MongoDB disconnected, attempting to reconnect...');
+  setTimeout(connectWithRetry, 5000);
+});
+
+mongoose.connection.on('reconnected', () => {
+  logger.info('MongoDB reconnected');
 });
 
 // Create uploads directory if it doesn't exist
@@ -143,6 +166,7 @@ app.get('/metrics', (req, res) => {
 
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/firebase-auth', require('./routes/firebase-auth'));
 app.use('/api/exams', require('./routes/exams'));
 app.use('/api/questions', require('./routes/questions'));
 app.use('/api/users', require('./routes/users'));
@@ -154,10 +178,12 @@ app.use('/api/categories', require('./routes/categories'));
 app.use('/api/chapters', require('./routes/chapters'));
 app.use('/api/topics', require('./routes/topics'));
 app.use('/api/bulk-import', require('./routes/bulk-import'));
+app.use('/api/upload', require('./routes/upload'));
 // app.use('/api/proctoring', require('./routes/proctoring'));
 // app.use('/api/courses', require('./routes/courses'));
-// app.use('/api/practice-tests', require('./routes/practice-tests'));
-// app.use('/api/study-materials', require('./routes/study-materials'));
+app.use('/api/practice-tests', require('./routes/practice-tests'));
+app.use('/api/study-materials', require('./routes/study-materials'));
+app.use('/api/exam-schedules', require('./routes/exam-schedules'));
 
 // Socket.IO authentication middleware
 // Temporarily disabled

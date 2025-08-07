@@ -65,117 +65,109 @@ router.post('/content',
         topics: { created: 0, skipped: 0, errors: [] }
       };
 
-      // Track created entities to avoid duplicates
-      const createdCategories = new Map();
-      const createdSubjects = new Map();
-      const createdChapters = new Map();
-      
       // Debug logging
       console.log(`Processing ${data.length} rows for bulk import`);
 
+      // Step 1: Process all subjects first
+      console.log('=== STEP 1: Processing Subjects ===');
+      const subjectsMap = new Map(); // subjectKey -> subjectId
+      
       for (let i = 0; i < data.length; i++) {
         const row = data[i];
-        const rowNumber = i + 2; // +2 because of 0-indexing and header row
-
-        try {
-          // 1. Create Category (if not exists)
-          let category = null;
-          if (row.category) {
-            const categoryName = row.category.trim();
-            if (!createdCategories.has(categoryName)) {
-              // Check if category already exists in database
-              let existingCategory = await Category.findOne({ name: categoryName });
-              if (!existingCategory) {
-                category = new Category({
-                  name: categoryName,
-                  description: row.category_description || '',
-                  color: row.category_color || '#3B82F6',
-                  icon: row.category_icon || '🏷️',
-                  order: parseInt(row.category_order) || 0,
-                  isActive: true,
-                  createdBy: req.user._id
-                });
-                await category.save();
-                results.categories.created++;
-                createdCategories.set(categoryName, category._id);
-              } else {
-                createdCategories.set(categoryName, existingCategory._id);
-                results.categories.skipped++;
-              }
-            }
-          }
-
-          // 2. Create Subject (if not exists)
-          let subject = null;
-          if (row.subject_name && row.subject_code) {
-            const subjectKey = `${row.subject_name.trim()}-${row.subject_code.trim()}`;
+        if (row.subject_name && row.subject_code) {
+          const subjectKey = `${row.subject_name.trim()}-${row.subject_code.trim()}`;
+          
+          if (!subjectsMap.has(subjectKey)) {
             console.log(`Processing subject: ${row.subject_name} (${row.subject_code})`);
             
-            if (!createdSubjects.has(subjectKey)) {
-              // Check if subject already exists
-              let existingSubject = await Subject.findOne({ 
-                $or: [
-                  { name: row.subject_name.trim() },
-                  { code: row.subject_code.trim() }
-                ]
-              });
-              
-              if (!existingSubject) {
-                subject = new Subject({
-                  name: row.subject_name.trim(),
-                  code: row.subject_code.trim(),
-                  description: row.subject_description || '',
-                  category: row.category || 'General',
-                  difficulty: row.subject_difficulty || 'Intermediate',
-                  icon: row.subject_icon || '',
-                  color: row.subject_color || '#3B82F6',
-                  order: parseInt(row.subject_order) || 0,
-                  isActive: true,
-                  createdBy: req.user._id
-                });
-                await subject.save();
-                console.log(`Created subject: ${subject.name} with ID: ${subject._id}`);
-                results.subjects.created++;
-                createdSubjects.set(subjectKey, subject._id);
-              } else {
-                console.log(`Found existing subject: ${existingSubject.name} with ID: ${existingSubject._id}`);
-                createdSubjects.set(subjectKey, existingSubject._id);
-                results.subjects.skipped++;
-              }
-            } else {
-              const subjectId = createdSubjects.get(subjectKey);
-              console.log(`Looking up existing subject with ID: ${subjectId}`);
-              subject = await Subject.findById(subjectId);
-              if (!subject) {
-                console.log(`Subject ID ${subjectId} not found in database, removing from map`);
-                createdSubjects.delete(subjectKey);
-                continue;
-              }
-              console.log(`Found subject in map: ${subject.name}`);
-            }
-          } else {
-            console.log(`Skipping subject creation - missing data: subject_name=${row.subject_name}, subject_code=${row.subject_code}`);
-          }
-
-          // 3. Create Chapter (if not exists)
-          let chapter = null;
-          if (row.chapter_name && row.chapter_code && subject) {
-            const chapterKey = `${subject._id}-${row.chapter_code.trim()}`;
-            console.log(`Processing chapter: ${row.chapter_name} (${row.chapter_code}) for subject: ${subject.name}`);
+            // Check if subject already exists in database
+            let existingSubject = await Subject.findOne({ 
+              $or: [
+                { name: row.subject_name.trim() },
+                { code: row.subject_code.trim() }
+              ]
+            });
             
-            if (!createdChapters.has(chapterKey)) {
+            if (!existingSubject) {
+              // Create category first if needed
+              let category = null;
+              if (row.category) {
+                const categoryName = row.category.trim();
+                let existingCategory = await Category.findOne({ name: categoryName });
+                if (!existingCategory) {
+                  category = new Category({
+                    name: categoryName,
+                    description: row.category_description || '',
+                    color: row.category_color || '#3B82F6',
+                    icon: row.category_icon || '🏷️',
+                    order: parseInt(row.category_order) || 0,
+                    isActive: true,
+                    createdBy: req.user._id
+                  });
+                  await category.save();
+                  results.categories.created++;
+                } else {
+                  results.categories.skipped++;
+                }
+              }
+              
+              // Create subject
+              const subject = new Subject({
+                name: row.subject_name.trim(),
+                code: row.subject_code.trim(),
+                description: row.subject_description || '',
+                category: row.category || 'General',
+                difficulty: row.subject_difficulty || 'Intermediate',
+                icon: row.subject_icon || '',
+                color: row.subject_color || '#3B82F6',
+                order: parseInt(row.subject_order) || 0,
+                isActive: true,
+                createdBy: req.user._id
+              });
+              await subject.save();
+              console.log(`Created subject: ${subject.name} with ID: ${subject._id}`);
+              results.subjects.created++;
+              subjectsMap.set(subjectKey, subject._id);
+            } else {
+              console.log(`Found existing subject: ${existingSubject.name} with ID: ${existingSubject._id}`);
+              results.subjects.skipped++;
+              subjectsMap.set(subjectKey, existingSubject._id);
+            }
+          }
+        }
+      }
+
+      // Step 2: Process all chapters
+      console.log('=== STEP 2: Processing Chapters ===');
+      const chaptersMap = new Map(); // chapterKey -> chapterId
+      
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        if (row.chapter_name && row.chapter_code && row.subject_name && row.subject_code) {
+          const subjectKey = `${row.subject_name.trim()}-${row.subject_code.trim()}`;
+          const subjectId = subjectsMap.get(subjectKey);
+          
+          if (subjectId) {
+            const chapterKey = `${subjectId}-${row.chapter_code.trim()}`;
+            
+            if (!chaptersMap.has(chapterKey)) {
+              console.log(`Processing chapter: ${row.chapter_name} (${row.chapter_code}) for subject: ${row.subject_name}`);
+              
               // Check if chapter already exists
               let existingChapter = await Chapter.findOne({
-                subjectId: subject._id,
+                subjectId: subjectId,
                 code: row.chapter_code.trim()
               });
               
               if (!existingChapter) {
-                chapter = new Chapter({
+                // Get subject details
+                const subject = await Subject.findById(subjectId);
+                
+                const chapter = new Chapter({
                   name: row.chapter_name.trim(),
                   code: row.chapter_code.trim(),
                   description: row.chapter_description || '',
-                  subjectId: subject._id,
+                  subjectId: subjectId,
                   subjectName: subject.name,
                   chapterNumber: parseInt(row.chapter_number) || 1,
                   difficulty: row.chapter_difficulty || 'Medium',
@@ -192,85 +184,81 @@ router.post('/content',
                 await chapter.save();
                 console.log(`Created chapter: ${chapter.name} with ID: ${chapter._id}`);
                 results.chapters.created++;
-                createdChapters.set(chapterKey, chapter._id);
+                chaptersMap.set(chapterKey, chapter._id);
               } else {
                 console.log(`Found existing chapter: ${existingChapter.name} with ID: ${existingChapter._id}`);
-                createdChapters.set(chapterKey, existingChapter._id);
                 results.chapters.skipped++;
+                chaptersMap.set(chapterKey, existingChapter._id);
               }
-            } else {
-              const chapterId = createdChapters.get(chapterKey);
-              console.log(`Looking up existing chapter with ID: ${chapterId}`);
-              chapter = await Chapter.findById(chapterId);
-              if (!chapter) {
-                console.log(`Chapter ID ${chapterId} not found in database, removing from map`);
-                // If chapter ID exists in map but not in database, remove from map and recreate
-                createdChapters.delete(chapterKey);
-                continue; // This will retry creating the chapter in the next iteration
-              }
-              console.log(`Found chapter in map: ${chapter.name}`);
             }
-          } else {
-            console.log(`Skipping chapter creation - missing data: chapter_name=${row.chapter_name}, chapter_code=${row.chapter_code}, subject=${subject ? 'exists' : 'missing'}`);
           }
+        }
+      }
 
-          // 4. Create Topic (if not exists)
-          if (row.topic_name && row.topic_code && chapter) {
-            console.log(`Processing topic: ${row.topic_name} (${row.topic_code}) for chapter: ${chapter.name}`);
+      // Step 3: Process all topics
+      console.log('=== STEP 3: Processing Topics ===');
+      
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        const rowNumber = i + 2; // +2 because of 0-indexing and header row
+        
+        try {
+          if (row.topic_name && row.topic_code && row.chapter_name && row.chapter_code && row.subject_name && row.subject_code) {
+            const subjectKey = `${row.subject_name.trim()}-${row.subject_code.trim()}`;
+            const chapterKey = `${subjectsMap.get(subjectKey)}-${row.chapter_code.trim()}`;
+            const chapterId = chaptersMap.get(chapterKey);
             
-            // Check if topic already exists
-            let existingTopic = await Topic.findOne({
-              chapterId: chapter._id,
-              code: row.topic_code.trim()
-            });
-            
-            if (!existingTopic) {
-              const topic = new Topic({
-                name: row.topic_name.trim(),
-                code: row.topic_code.trim(),
-                description: row.topic_description || '',
-                subjectId: subject._id,
-                subjectName: subject.name,
-                chapterId: chapter._id,
-                chapterName: chapter.name,
-                topicNumber: parseInt(row.topic_number) || 1,
-                difficulty: row.topic_difficulty || 'Medium',
-                weightage: parseFloat(row.topic_weightage) || 0,
-                estimatedHours: parseFloat(row.topic_estimated_hours) || 0,
-                content: row.topic_content || '',
-                learningObjectives: row.topic_learning_objectives ? 
-                  row.topic_learning_objectives.split(',').map(obj => obj.trim()) : [],
-                keyConcepts: row.topic_key_concepts ? 
-                  row.topic_key_concepts.split(',').map(concept => concept.trim()) : [],
-                formulas: row.topic_formulas ? 
-                  row.topic_formulas.split(',').map(formula => formula.trim()) : [],
-                isActive: true,
-                createdBy: req.user._id
+            if (chapterId) {
+              console.log(`Processing topic: ${row.topic_name} (${row.topic_code}) for chapter: ${row.chapter_name}`);
+              
+              // Check if topic already exists
+              let existingTopic = await Topic.findOne({
+                chapterId: chapterId,
+                code: row.topic_code.trim()
               });
-              await topic.save();
-              console.log(`Created topic: ${topic.name} with ID: ${topic._id}`);
-              results.topics.created++;
-            } else {
-              console.log(`Skipped existing topic: ${existingTopic.name}`);
-              results.topics.skipped++;
+              
+              if (!existingTopic) {
+                // Get subject and chapter details
+                const subjectKey = `${row.subject_name.trim()}-${row.subject_code.trim()}`;
+                const subjectId = subjectsMap.get(subjectKey);
+                const subject = await Subject.findById(subjectId);
+                const chapter = await Chapter.findById(chapterId);
+                
+                const topic = new Topic({
+                  name: row.topic_name.trim(),
+                  code: row.topic_code.trim(),
+                  description: row.topic_description || '',
+                  subjectId: subjectId,
+                  subjectName: subject.name,
+                  chapterId: chapterId,
+                  chapterName: chapter.name,
+                  topicNumber: parseInt(row.topic_number) || 1,
+                  difficulty: row.topic_difficulty || 'Medium',
+                  weightage: parseFloat(row.topic_weightage) || 0,
+                  estimatedHours: parseFloat(row.topic_estimated_hours) || 0,
+                  content: row.topic_content || '',
+                  learningObjectives: row.topic_learning_objectives ? 
+                    row.topic_learning_objectives.split(',').map(obj => obj.trim()) : [],
+                  keyConcepts: row.topic_key_concepts ? 
+                    row.topic_key_concepts.split(',').map(concept => concept.trim()) : [],
+                  formulas: row.topic_formulas ? 
+                    row.topic_formulas.split(',').map(formula => formula.trim()) : [],
+                  isActive: true,
+                  createdBy: req.user._id
+                });
+                await topic.save();
+                console.log(`Created topic: ${topic.name} with ID: ${topic._id}`);
+                results.topics.created++;
+              } else {
+                console.log(`Skipped existing topic: ${existingTopic.name}`);
+                results.topics.skipped++;
+              }
             }
-          } else {
-            console.log(`Skipping topic creation - missing data: topic_name=${row.topic_name}, topic_code=${row.topic_code}, chapter=${chapter ? 'exists' : 'missing'}`);
           }
-
         } catch (error) {
           const errorMsg = `Row ${rowNumber}: ${error.message}`;
-          if (error.message.includes('category')) {
-            results.categories.errors.push(errorMsg);
-          } else if (error.message.includes('subject')) {
-            results.subjects.errors.push(errorMsg);
-          } else if (error.message.includes('chapter')) {
-            results.chapters.errors.push(errorMsg);
-          } else if (error.message.includes('topic')) {
-            results.topics.errors.push(errorMsg);
-          } else {
-            results.topics.errors.push(errorMsg);
-          }
+          results.topics.errors.push(errorMsg);
+          console.error(`Error processing row ${rowNumber}:`, error);
         }
       }
 

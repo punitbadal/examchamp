@@ -58,6 +58,7 @@ export default function ExamSchedulePage() {
   const [schedules, setSchedules] = useState<ExamSchedule[]>([]);
   const [availableExams, setAvailableExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [examsLoading, setExamsLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<ExamSchedule | null>(null);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
@@ -68,6 +69,7 @@ export default function ExamSchedulePage() {
     proctoringEnabled: 'true',
     instructions: ''
   });
+  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
     fetchSchedules();
@@ -77,61 +79,51 @@ export default function ExamSchedulePage() {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, fetch from API
-      const mockSchedules: ExamSchedule[] = [
-        {
-          id: '1',
-          examId: 'exam1',
-          title: 'JEE Main Mock Test 1',
-          examCode: 'JEE001',
-          startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-          endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-          duration: 180,
-          maxAttempts: 3,
-          totalMarks: 300,
-          passMarks: 120,
-          status: 'scheduled',
-          participants: 156,
-          proctoringEnabled: true,
-          instructions: 'This is a mock test for JEE Main preparation. Please ensure stable internet connection.',
-          subjects: ['Physics', 'Chemistry', 'Mathematics']
-        },
-        {
-          id: '2',
-          examId: 'exam2',
-          title: 'NEET Practice Test',
-          examCode: 'NEET001',
-          startDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-          endDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000), // 10 days from now
-          duration: 200,
-          maxAttempts: 2,
-          totalMarks: 720,
-          passMarks: 288,
-          status: 'scheduled',
-          participants: 89,
-          proctoringEnabled: true,
-          instructions: 'NEET practice test covering all subjects. Time management is crucial.',
-          subjects: ['Physics', 'Chemistry', 'Biology']
-        },
-        {
-          id: '3',
-          examId: 'exam3',
-          title: 'GATE Computer Science',
-          examCode: 'GATE001',
-          startDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-          endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
-          duration: 180,
-          maxAttempts: 1,
-          totalMarks: 100,
-          passMarks: 25,
-          status: 'active',
-          participants: 234,
-          proctoringEnabled: false,
-          instructions: 'GATE Computer Science practice test. Focus on core concepts.',
-          subjects: ['Computer Science']
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:3001/api/exam-schedules', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      ];
-      setSchedules(mockSchedules);
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || 'Failed to fetch schedules');
+      }
+
+      const data = await response.json();
+      console.log('Schedules data received:', data);
+      
+      // Transform API data to match our interface
+      const transformedSchedules: ExamSchedule[] = data.schedules.map((schedule: any) => ({
+        id: schedule._id,
+        examId: schedule.examId._id || schedule.examId,
+        title: schedule.title,
+        examCode: schedule.examCode,
+        startDate: new Date(schedule.startDate),
+        endDate: new Date(schedule.endDate),
+        duration: schedule.duration,
+        maxAttempts: schedule.maxAttempts,
+        totalMarks: schedule.totalMarks,
+        passMarks: schedule.passMarks,
+        status: schedule.status,
+        participants: schedule.participants,
+        proctoringEnabled: schedule.proctoringEnabled,
+        instructions: schedule.instructions,
+        subjects: schedule.subjects || [],
+        maxParticipants: schedule.maxParticipants,
+        allowedUsers: schedule.allowedUsers
+      }));
+
+      setSchedules(transformedSchedules);
     } catch (error) {
       console.error('Error fetching schedules:', error);
     } finally {
@@ -141,60 +133,51 @@ export default function ExamSchedulePage() {
 
   const fetchAvailableExams = async () => {
     try {
-      // Mock data - in real app, fetch from API
-      const mockExams: Exam[] = [
-        {
-          _id: 'exam1',
-          title: 'JEE Main Mock Test 1',
-          examCode: 'JEE001',
-          description: 'Comprehensive mock test for JEE Main preparation',
-          duration: 180,
-          totalMarks: 300,
-          examType: 'mock',
-          maxAttempts: 1,
-          passingScore: 120,
-          isActive: true,
-          proctoringEnabled: true,
-          sections: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        {
-          _id: 'exam2',
-          title: 'NEET Practice Test',
-          examCode: 'NEET001',
-          description: 'Practice test for NEET preparation',
-          duration: 200,
-          totalMarks: 720,
-          examType: 'practice',
-          maxAttempts: 3,
-          passingScore: 288,
-          isActive: true,
-          proctoringEnabled: false,
-          sections: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        {
-          _id: 'exam3',
-          title: 'GATE Computer Science',
-          examCode: 'GATE001',
-          description: 'GATE Computer Science practice test',
-          duration: 180,
-          totalMarks: 100,
-          examType: 'live',
-          maxAttempts: 1,
-          passingScore: 25,
-          isActive: true,
-          proctoringEnabled: true,
-          sections: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+      setExamsLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+
+      const response = await fetch('http://localhost:3001/api/exams', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      ];
-      setAvailableExams(mockExams);
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch exams');
+      }
+
+      const data = await response.json();
+      
+      // Transform API data to match our interface
+      const exams: Exam[] = data.exams.map((exam: any) => ({
+        _id: exam._id,
+        title: exam.title,
+        examCode: exam.examCode,
+        description: exam.description,
+        duration: exam.totalDuration,
+        totalMarks: exam.totalMarks,
+        examType: exam.examType || 'live',
+        maxAttempts: exam.maxAttempts,
+        passingScore: exam.passingScore,
+        isActive: exam.isActive,
+        proctoringEnabled: exam.proctoring?.enabled || false,
+        sections: exam.sections || [],
+        createdAt: exam.createdAt,
+        updatedAt: exam.updatedAt
+      }));
+
+      setAvailableExams(exams);
     } catch (error) {
       console.error('Error fetching available exams:', error);
+      // Fallback to empty array if API fails
+      setAvailableExams([]);
+    } finally {
+      setExamsLoading(false);
     }
   };
 
@@ -224,20 +207,48 @@ export default function ExamSchedulePage() {
     return `${hours}h ${mins}m`;
   };
 
-  const calculateEndTime = (startTime: string, durationMinutes: number) => {
-    if (!startTime) return '';
-    
-    const startDate = new Date(startTime);
-    const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
-    
-    // Format to datetime-local format (YYYY-MM-DDTHH:MM)
-    const year = endDate.getFullYear();
-    const month = String(endDate.getMonth() + 1).padStart(2, '0');
-    const day = String(endDate.getDate()).padStart(2, '0');
-    const hours = String(endDate.getHours()).padStart(2, '0');
-    const minutes = String(endDate.getMinutes()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+
+
+  const validateScheduleForm = () => {
+    const errors: {[key: string]: string} = {};
+
+    // Validate exam selection
+    if (!selectedExam) {
+      errors.exam = 'Please select an exam to schedule';
+    }
+
+    // Validate start time
+    if (!scheduleForm.startTime) {
+      errors.startTime = 'Start date and time is required';
+    }
+
+    // Validate end time
+    if (!scheduleForm.endTime) {
+      errors.endTime = 'End date and time is required';
+    }
+
+    // Validate that end time is after start time
+    if (scheduleForm.startTime && scheduleForm.endTime) {
+      const startDate = new Date(scheduleForm.startTime);
+      const endDate = new Date(scheduleForm.endTime);
+      
+      if (endDate <= startDate) {
+        errors.endTime = 'End date and time must be after start date and time';
+      }
+    }
+
+    // Validate that start time is in the future
+    if (scheduleForm.startTime) {
+      const startDate = new Date(scheduleForm.startTime);
+      const now = new Date();
+      
+      if (startDate <= now) {
+        errors.startTime = 'Start date and time must be in the future';
+      }
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleScheduleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -248,13 +259,72 @@ export default function ExamSchedulePage() {
       [name]: value
     }));
 
-    // Auto-calculate end time when start time changes
-    if (name === 'startTime' && selectedExam) {
-      const endTime = calculateEndTime(value, selectedExam.duration);
-      setScheduleForm(prev => ({
+    // Clear error when user starts typing
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
         ...prev,
-        endTime
+        [name]: ''
       }));
+    }
+  };
+
+  const handleScheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (validateScheduleForm()) {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          alert('Authentication token not found');
+          return;
+        }
+
+        const scheduleData = {
+          examId: selectedExam?._id,
+          startDate: scheduleForm.startTime,
+          endDate: scheduleForm.endTime,
+          maxParticipants: scheduleForm.maxParticipants ? parseInt(scheduleForm.maxParticipants) : undefined,
+          proctoringEnabled: scheduleForm.proctoringEnabled === 'true',
+          instructions: scheduleForm.instructions
+        };
+
+        const response = await fetch('http://localhost:3001/api/exam-schedules', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(scheduleData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create schedule');
+        }
+
+        const result = await response.json();
+        console.log('Schedule created:', result);
+        
+        alert('Schedule created successfully!');
+        setShowCreateForm(false);
+        setScheduleForm({
+          startTime: '',
+          endTime: '',
+          maxParticipants: '',
+          proctoringEnabled: 'true',
+          instructions: ''
+        });
+        setFormErrors({});
+        setSelectedExam(null);
+        
+        // Refresh the schedules list
+        fetchSchedules();
+      } catch (error) {
+        console.error('Error creating schedule:', error);
+        alert(`Error creating schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      console.log('Form validation failed:', formErrors);
     }
   };
 
@@ -368,27 +438,39 @@ export default function ExamSchedulePage() {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border p-6">
-        <form className="space-y-6">
-          {/* Exam Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Exam to Schedule *
-            </label>
-            <select
-              value={selectedExam?._id || ''}
-              onChange={(e) => {
-                const exam = availableExams.find(ex => ex._id === e.target.value);
-                setSelectedExam(exam || null);
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Choose an exam to make live</option>
-              {availableExams.map((exam) => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.title} ({exam.examCode}) - {exam.examType}
+        <form className="space-y-6" onSubmit={handleScheduleSubmit}>
+                      {/* Exam Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Exam to Schedule *
+              </label>
+              <select
+                value={selectedExam?._id || ''}
+                onChange={(e) => {
+                  const exam = availableExams.find(ex => ex._id === e.target.value);
+                  setSelectedExam(exam || null);
+                  // Clear error when user selects an exam
+                  if (formErrors.exam) {
+                    setFormErrors(prev => ({ ...prev, exam: '' }));
+                  }
+                }}
+                disabled={examsLoading}
+                className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                  formErrors.exam ? 'border-red-500' : 'border-gray-300'
+                }`}
+              >
+                <option value="">
+                  {examsLoading ? 'Loading exams...' : availableExams.length === 0 ? 'No exams available' : 'Choose an exam to make live'}
                 </option>
-              ))}
-            </select>
+                {availableExams.map((exam) => (
+                  <option key={exam._id} value={exam._id}>
+                    {exam.title} ({exam.examCode}) - {exam.examType}
+                  </option>
+                ))}
+              </select>
+              {formErrors.exam && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.exam}</p>
+              )}
             {selectedExam && (
               <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                 <h4 className="font-medium text-blue-900">{selectedExam.title}</h4>
@@ -405,6 +487,13 @@ export default function ExamSchedulePage() {
           {selectedExam && (
             <>
               {/* Schedule Details */}
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Note:</strong> Start and End times control when the exam is visible to students. 
+                  The actual exam timer during the test is based on the exam duration set during exam creation.
+                </p>
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -415,22 +504,31 @@ export default function ExamSchedulePage() {
                     name="startTime"
                     value={scheduleForm.startTime}
                     onChange={handleScheduleFormChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                      formErrors.startTime ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
+                  {formErrors.startTime && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.startTime}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date & Time * (Auto-calculated)
+                    End Date & Time *
                   </label>
                   <input
                     type="datetime-local"
                     name="endTime"
                     value={scheduleForm.endTime}
                     onChange={handleScheduleFormChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    readOnly
+                    className={`w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                      formErrors.endTime ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
+                  {formErrors.endTime && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.endTime}</p>
+                  )}
                 </div>
               </div>
 

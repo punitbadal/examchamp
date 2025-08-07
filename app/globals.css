@@ -2,299 +2,256 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
+/* React Quill CSS */
+@import 'react-quill/dist/quill.snow.css';
+@import 'katex/dist/katex.min.css';
+
+/* Global styles */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
-  }
-  
-  body {
-    @apply text-gray-900 bg-gray-50;
+    color-scheme: dark;
   }
 }
 
-@layer components {
-  .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200;
-  }
-  
-  .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
-  }
-  
-  .btn-secondary {
-    @apply btn bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-primary-500;
-  }
-  
-  .btn-success {
-    @apply btn bg-success-600 text-white hover:bg-success-700 focus:ring-success-500;
-  }
-  
-  .btn-danger {
-    @apply btn bg-danger-600 text-white hover:bg-danger-700 focus:ring-danger-500;
-  }
-  
-  .btn-warning {
-    @apply btn bg-warning-600 text-white hover:bg-warning-700 focus:ring-warning-500;
-  }
-  
-  .input {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm;
-  }
-  
-  .input-error {
-    @apply input border-danger-300 text-danger-900 placeholder-danger-300 focus:ring-danger-500 focus:border-danger-500;
-  }
-  
-  .card {
-    @apply bg-white overflow-hidden shadow rounded-lg;
-  }
-  
-  .card-header {
-    @apply px-4 py-5 sm:px-6 border-b border-gray-200;
-  }
-  
-  .card-body {
-    @apply px-4 py-5 sm:p-6;
-  }
-  
-  .card-footer {
-    @apply px-4 py-4 sm:px-6 bg-gray-50 border-t border-gray-200;
-  }
-  
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-  
-  .badge-primary {
-    @apply badge bg-primary-100 text-primary-800;
-  }
-  
-  .badge-success {
-    @apply badge bg-success-100 text-success-800;
-  }
-  
-  .badge-warning {
-    @apply badge bg-warning-100 text-warning-800;
-  }
-  
-  .badge-danger {
-    @apply badge bg-danger-100 text-danger-800;
-  }
-  
-  .badge-gray {
-    @apply badge bg-gray-100 text-gray-800;
-  }
+/* React Quill Editor Styles - Fixed for toolbar visibility and stability */
+.react-quill-editor {
+  width: 100%;
+  position: relative;
 }
 
-@layer utilities {
-  .text-shadow {
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-  
-  .exam-timer {
-    @apply text-2xl font-bold text-danger-600 bg-danger-50 px-4 py-2 rounded-lg border border-danger-200;
-  }
-  
-  .question-palette {
-    @apply grid grid-cols-5 gap-2;
-  }
-  
-  .question-number {
-    @apply w-10 h-10 flex items-center justify-center text-sm font-medium rounded border-2 cursor-pointer transition-colors duration-200;
-  }
-  
-  .question-number-answered {
-    @apply question-number bg-success-100 border-success-300 text-success-700;
-  }
-  
-  .question-number-unanswered {
-    @apply question-number bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200;
-  }
-  
-  .question-number-marked {
-    @apply question-number bg-warning-100 border-warning-300 text-warning-700;
-  }
-  
-  .question-number-current {
-    @apply question-number bg-primary-100 border-primary-300 text-primary-700;
-  }
+.quill-container {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  position: relative;
+  z-index: 1;
 }
 
-/* Custom animations */
-@keyframes pulse-slow {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+/* Force React Quill to display properly */
+.quill {
+  display: flex !important;
+  flex-direction: column !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+/* Toolbar styles - ensure it's always visible */
+.ql-toolbar.ql-snow {
+  border: none !important;
+  border-bottom: 1px solid #ccc !important;
+  background-color: #f8f9fa !important;
+  padding: 8px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 10 !important;
+  min-height: 42px !important;
 }
 
-/* Exam-specific styles */
-.exam-container {
-  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+/* Container styles */
+.ql-container.ql-snow {
+  border: none !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  min-height: 150px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
-.exam-header {
-  @apply bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10;
+/* Editor styles */
+.ql-editor {
+  padding: 12px !important;
+  min-height: 150px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
-.exam-content {
-  @apply flex-1 overflow-hidden;
+.ql-editor p {
+  margin-bottom: 8px !important;
 }
 
-.exam-sidebar {
-  @apply w-80 bg-white border-l border-gray-200 overflow-y-auto;
+.ql-editor h1,
+.ql-editor h2,
+.ql-editor h3 {
+  margin-bottom: 12px !important;
+  font-weight: 600 !important;
 }
 
-.exam-main {
-  @apply flex-1 overflow-y-auto;
+.ql-editor ul,
+.ql-editor ol {
+  margin-bottom: 8px !important;
+  padding-left: 20px !important;
 }
 
-.question-container {
-  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+.ql-editor blockquote {
+  border-left: 4px solid #ccc !important;
+  padding-left: 12px !important;
+  margin: 8px 0 !important;
+  font-style: italic !important;
 }
 
-.question-text {
-  @apply text-lg font-medium text-gray-900 mb-4;
+.ql-editor pre {
+  background-color: #f8f9fa !important;
+  padding: 8px !important;
+  border-radius: 4px !important;
+  font-family: 'Courier New', monospace !important;
+  margin: 8px 0 !important;
 }
 
-.question-options {
-  @apply space-y-3;
+.ql-editor code {
+  background-color: #f8f9fa !important;
+  padding: 2px 4px !important;
+  border-radius: 3px !important;
+  font-family: 'Courier New', monospace !important;
+  font-size: 0.9em !important;
 }
 
-.question-option {
-  @apply flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200;
+/* Toolbar button styles */
+.ql-toolbar button {
+  margin-right: 4px !important;
+  padding: 4px !important;
+  border-radius: 3px !important;
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
-.question-option-selected {
-  @apply question-option bg-primary-50 border-primary-300;
+.ql-toolbar button:hover {
+  background-color: #e9ecef !important;
 }
 
-.question-option-correct {
-  @apply question-option bg-success-50 border-success-300;
+.ql-toolbar .ql-active {
+  background-color: #007bff !important;
+  color: white !important;
 }
 
-.question-option-incorrect {
-  @apply question-option bg-danger-50 border-danger-300;
+/* Formula/LaTeX styles */
+.ql-editor .ql-formula {
+  background-color: #f8f9fa !important;
+  padding: 4px 8px !important;
+  border-radius: 3px !important;
+  font-family: 'Courier New', monospace !important;
+  border: 1px solid #dee2e6 !important;
 }
 
-/* Proctoring styles */
-.proctoring-warning {
-  @apply bg-warning-50 border border-warning-200 rounded-md p-4 mb-4;
+/* Image styles */
+.ql-editor img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 4px !important;
+  margin: 8px 0 !important;
 }
 
-.proctoring-alert {
-  @apply bg-danger-50 border border-danger-200 rounded-md p-4 mb-4;
+/* Focus states */
+.ql-container:focus-within {
+  border-color: #007bff !important;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25) !important;
 }
 
-/* Loading states */
-.loading-spinner {
-  @apply animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600;
+/* Placeholder styles */
+.ql-editor.ql-blank::before {
+  color: #6c757d !important;
+  font-style: italic !important;
+  content: attr(data-placeholder) !important;
 }
 
-.loading-skeleton {
-  @apply animate-pulse bg-gray-200 rounded;
+/* Ensure proper z-index for dropdowns */
+.ql-toolbar .ql-picker {
+  z-index: 1000 !important;
 }
 
-/* Responsive design */
+/* Override any conflicting styles */
+.ql-toolbar.ql-snow .ql-formats {
+  display: flex !important;
+  align-items: center !important;
+  margin-right: 8px !important;
+}
+
+.ql-toolbar.ql-snow .ql-stroke {
+  stroke: currentColor !important;
+}
+
+.ql-toolbar.ql-snow .ql-fill {
+  fill: currentColor !important;
+}
+
+.ql-toolbar.ql-snow .ql-picker {
+  color: #444 !important;
+  display: inline-block !important;
+  float: left !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  height: 24px !important;
+  position: relative !important;
+  vertical-align: middle !important;
+}
+
+/* Prevent editor from disappearing */
+.ql-toolbar.ql-snow,
+.ql-container.ql-snow,
+.ql-editor {
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Ensure stable positioning */
+.ql-toolbar.ql-snow {
+  position: sticky !important;
+  top: 0 !important;
+  background-color: #f8f9fa !important;
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
-  .exam-sidebar {
-    @apply w-full border-l-0 border-t border-gray-200;
+  .ql-toolbar.ql-snow {
+    padding: 4px !important;
   }
   
-  .question-palette {
-    @apply grid-cols-4;
+  .ql-toolbar button {
+    margin-right: 2px !important;
+    padding: 2px !important;
   }
   
-  .question-number {
-    @apply w-8 h-8 text-xs;
+  .ql-editor {
+    padding: 8px !important;
+    min-height: 120px !important;
   }
-}
-
-/* Rich Text Editor Styles */
-.ProseMirror {
-  @apply outline-none;
-}
-
-.ProseMirror p.is-editor-empty:first-child::before {
-  color: #adb5bd;
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-}
-
-.ProseMirror h1 {
-  @apply text-2xl font-bold text-gray-900 mb-4;
-}
-
-.ProseMirror h2 {
-  @apply text-xl font-bold text-gray-900 mb-3;
-}
-
-.ProseMirror h3 {
-  @apply text-lg font-bold text-gray-900 mb-2;
-}
-
-.ProseMirror p {
-  @apply text-gray-700 mb-2;
-}
-
-.ProseMirror ul {
-  @apply list-disc list-inside mb-2;
-}
-
-.ProseMirror ol {
-  @apply list-decimal list-inside mb-2;
-}
-
-.ProseMirror li {
-  @apply text-gray-700;
-}
-
-.ProseMirror strong {
-  @apply font-bold;
-}
-
-.ProseMirror em {
-  @apply italic;
-}
-
-.ProseMirror u {
-  @apply underline;
-}
-
-.ProseMirror mark {
-  @apply bg-yellow-200 px-1 rounded;
-}
-
-.ProseMirror .is-editor-empty:first-child::before {
-  @apply text-gray-400;
-}
-
-/* Math rendering styles */
-.katex {
-  @apply text-base;
-}
-
-.katex-display {
-  @apply my-4;
-}
-
-.katex-display > .katex {
-  @apply text-lg;
 } 

@@ -78,6 +78,13 @@ const authenticateToken = async (req, res, next) => {
 // Role-based access control middleware
 const authorize = (...roles) => {
   return (req, res, next) => {
+    console.log('Authorization check:', {
+      hasUser: !!req.user,
+      userRole: req.user?.role,
+      requiredRoles: roles,
+      path: req.path
+    });
+
     if (!req.user) {
       return next(new AuthenticationError('Authentication required'));
     }
@@ -93,6 +100,7 @@ const authorize = (...roles) => {
       return next(new AuthorizationError('Insufficient permissions'));
     }
 
+    console.log('Authorization successful for role:', req.user.role);
     next();
   };
 };

@@ -432,7 +432,7 @@ export default function ChaptersPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/chapters', {
+      const response = await fetch('/api/chapters?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -454,7 +454,7 @@ export default function ChaptersPage() {
   const loadSubjects = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/subjects', {
+      const response = await fetch('/api/subjects?limit=1000', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
